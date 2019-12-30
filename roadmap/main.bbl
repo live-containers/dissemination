@@ -1,0 +1,71 @@
+\begin{thebibliography}{10}
+
+\bibitem{criu-wiki}
+CRIU Foundation.
+\newblock {Checkpoint Restore in Userspace - Wiki}.
+\newblock \url{https://criu.org/Main_Page}, 2019.
+\newblock [Last accessed 14/10/2019].
+
+\bibitem{criu-github}
+CRIU Foundation.
+\newblock {CRIU -- A project to implement checkpoint/restore functionality for
+  Linux}.
+\newblock \url{https://github.com/checkpoint-restore/criu}, 2019.
+\newblock [Last accessed 14/10/2019].
+
+\bibitem{live-migration-criu}
+Joab Jackson.
+\newblock {Live Migration - CRIU Wiki}.
+\newblock \url{https://criu.org/Live_migration}, 2019.
+\newblock [Last accessed 14/10/2019].
+
+\bibitem{phaul-criu}
+CRIU Foundation.
+\newblock {Process Haul - CRIU Wiki}.
+\newblock \url{https://criu.org/P.Haul}, 2019.
+\newblock [Last accessed 14/10/2019].
+
+\bibitem{phaul-github}
+CRIU Foundation.
+\newblock {Process Haul - Github}.
+\newblock \url{https://github.com/checkpoint-restore/go-criu}, 2019.
+\newblock [Last accessed 14/10/2019].
+
+\bibitem{criu-docker}
+CRIU Foudnation.
+\newblock {Docker Integration - CRIU}.
+\newblock \url{https://criu.org/Docker}, 2019.
+
+\bibitem{Raynal2013}
+Michel Raynal.
+\newblock {\em Distributed Algorithms for Message-Passing Systems}.
+\newblock Springer Publishing Company, Incorporated, 2013.
+
+\bibitem{Kshemkalyani2008}
+Ajay~D. Kshemkalyani and Mukesh Singhal.
+\newblock {\em Distributed Computing: Principles, Algorithms, and Systems}.
+\newblock Cambridge University Press, New York, NY, USA, 1 edition, 2008.
+
+\bibitem{criu-comparison}
+CRIU Foudnation.
+\newblock {Comparison with other CR Projects - CRIU}.
+\newblock \url{https://criu.org/Comparison_to_other_CR_projects}, 2019.
+
+\bibitem{Bouteiller2006}
+A.~Bouteiller, T.~Herault, G.~Krawezik, P.~Lemarinier, and F.~Cappello.
+\newblock Mpich-v project: A multiprotocol automatic fault tolerant mpi.
+\newblock {\em IJHPCA}, 20:319--333, 08 2006.
+
+\bibitem{blcr}
+Computer Language and Systems~Software Group.
+\newblock {Berkeley Lab Checkpoint/Restart (BLCR) for LINUX}.
+\newblock
+  \url{https://crd.lbl.gov/departments/computer-science/CLaSS/research/BLCR/},
+  2013.
+
+\bibitem{dmtcp}
+DMTCP.
+\newblock {Distributed MultiThreaded Checkpointing}.
+\newblock \url{http://dmtcp.sourceforge.net/}, 2019.
+
+\end{thebibliography}

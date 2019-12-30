@@ -1,0 +1,143 @@
+\documentclass[a4paper, 10pt]{article}
+\usepackage[utf8]{inputenc} % Change according your file encoding
+\usepackage{graphicx}
+\usepackage{setspace}
+\usepackage{url}
+\usepackage{lipsum}
+\usepackage{tikz}
+\usepackage[a4paper, left=2cm, right=2cm, top=2cm, bottom=2cm]{geometry}
+
+\onehalfspacing
+\newlength\Colsep
+\setlength\Colsep{10pt}
+
+\begin{document}
+
+Carlos Segarra \hfill Monday, October 21st
+
+\vspace{15pt}
+
+\begin{center}
+    \textbf{Research Collaboration Project - MSc Thesis Project}
+
+    \vspace{10pt}
+
+    \textbf{\Large Live Migration of Container Deployments Using CRIU}
+
+    \vspace{10pt}
+
+    \small{Carlos Segarra (\texttt{carlos.segarra@estudiant.upc.edu}) - Jordi Guitart (\texttt{jguitart@ac.upc.edu})}
+\end{center}
+
+\vspace{10pt}
+
+\subsection*{Project Description - TL;DR}
+
+The aim of this project is to implement live migration for all sorts of container deployments.
+In particular, we want to use Checkpoint Restore in Userspace (CRIU) to perform live migrations of arbitrary Docker deployments (including swarms) with minimal performance overhead and obliviously to the underlying architecture.
+
+It will be developed during the 2019-2020 academic year, resulting in a Master Thesis and a scientific contribution in the form of an article or paper.
+
+\vspace{10pt}
+
+\hrule
+
+%\vspace{5pt}
+
+\subsection*{Distributed CRIU}
+Checkpoint Restore in Userspace~\cite{criu-wiki} (CRIU) is a Linux open-source~\cite{criu-github} software that enables to freeze a running application, checkpoint it's state to disk, and restore it elsewhere at the exact same point it was frozen.
+
+\textbf{Live Migration and P.Haul}
+
+Checkpointing and restoring to a different physical machine without impacting client processes or applications is denoted as \textbf{live migration}~\cite{live-migration-criu}.
+\textbf{P.Haul}~\cite{phaul-criu,phaul-github} is an extension to CRIU specially suited for live migration.
+It ships as a \textsc{Go} library and is used to perform container migration.
+
+% CRIU in Docker
+\textbf{CRIU in Docker}
+
+There already exists an integration of CRIU with Docker~\cite{criu-docker} since Docker 1.13.
+To enable it, the Docker daemon must run in experimental mode.
+Some demo apps are available in an open Github Repo~\footnote{https://github.com/csegarragonz/criu-demos/looper-single}.
+
+% C/R of Distribtued Applications
+\textbf{Checkpoint/Restore of Distributed Applications}
+
+On the other hand, live migration of distributed applications has already been studied for a long time theoretically~\cite{Raynal2013,Kshemkalyani2008}, but has not seen a succesful implementation in practice.
+In particular, for distributed applications, rollback algorithms are usually the prefered ones in the literature.
+Among rollback algorithms the authors differentiate between global checkpointing algorithms (coordinated, uncoordinated, or communication induced checkpointing), where the classical Chandy-Lamport algorithm lies, or Message Passing/Logging Algorithms (Pessimistic, optimistic, and causal).
+Further, self-stabilizing CR for ever-running applications should also be considered given that we want to do CR on containers which could need to run for a long time without halting.
+For illustrative purposes, we could do a small review on the existing ones.
+
+\textbf{Related Work}
+
+Among relevant related work, here we highlight those we could use in practice and benchmark against.
+The development team at the CRIU Foudnation provide themselves a quick SoA on the different CR projects with a comparison chart~\cite{criu-comparison}.
+Note that, in general, fault-tolerancy is the biggest driven factor to support checkpoint/restore in an applciation (specially a distributed one). 
+On the contrary, the initial scope of this project is to implement and support C/R in a controlled environment, without fault-tolerancy or fault injection.
+This remains as an open topic for further benchmarking down the line.
+
+
+Firstly, MPICH-V~\cite{Bouteiller2006} presents a general framework to implement fault-tolerant in MPI.
+The authors provide three novel algorithms based on the message logging paradigm and an optimization of the Chandy-Lamport algorithm for coordinated checkpointing.
+Although the results were novel back then, they seem to be a little bit deprecated as of today.
+The evolution of fault-tolerant MPI is Berkeley Lab Checkpoint/Restart~\cite{blcr} (BLCR) a project funded by the US government with High Performance Computing (HPC) in mind.
+
+Distribbuted MultiThreaded Checkpointing~\cite{dmtcp} (DMTCP) checkpoints single-host or distributed computations in user-space.
+We implement a very simple proof of concept~\footnote{https://github.com/csegarragonz/criu-demos/tree/master/dmtcp}.
+There are two main differences between DMTCP and CRIU.
+First, the former requires the code to be dynamically linked to their headers in order to perform CR, whilst CRIU does not require that.
+Secondly, DMTCP works by wrapping certain syscalls, CRIU on the other hand expects the Kernel to support it's features.
+
+% How we plan to ship the thing
+\textbf{Roadmap}
+
+Beneath included a tentative table of contents to progress with the project.
+They all contain a deadline but it's meant to be very orientative and to have a general idea on how work should be distributed.
+
+\begin{enumerate}
+    \item \textbf{Familiarization \& Bibliography:} \hfill \textbf{DL:} Nov-Dec 2019
+
+        The aim of this first block is to get introduced to the different topics we want to tackle, understand the underlying concepts, research the state of the art and get used to the software we will be using. In particular, the topics to be researched can be enumerated as follows:
+    \begin{enumerate}
+        \item Checkpoint\textbackslash Restore \& Live Migration
+        \item Docker \& Docker Swarm \& Other Distributed Docker Deployments
+        \item Live Migration of Distributed Applications
+        \item CRIU: Deployment and Usage
+        \item Distributed Checkpointing Algorithms: consider doing a mini-suvey on those for academical purposes.
+    \end{enumerate}
+    \item \textbf{CRIU for Live Migration:} \hfill \textbf{DL:} Jan-Feb 2020
+
+        The second block of work could focus on the already implemented CR functionality for Docker. Starting from pure code inspection, parameter tuning, and adding some functionality to get comfortable with the development pipeline. Some work could also be done to leverage P.Haul in another test setting for demonstration purposes. Lastly, it would be good to perform an evaluation of the introduced overhead and compare it against other CR tools like DMTCP.
+    \begin{enumerate}
+        \item P.Haul
+        \item Live Migration of Docker Containers
+        \item Evaluation \& Benchmarking
+    \end{enumerate}
+    \item \textbf{Live Migration of Distibuted Docker Deployments:} \hfill \textbf{DL:} May-June 2020
+
+        This third block would contain all the novelty in our development. Here we would implement CR for clusters of Docker containers. Initially we could start with Docker Swarm and a simple distribtued algorithm. Then we could try and implement further and more advanced algorithms, and make that a tunable parameter in the deployment compose file. Lastly, an in-depth evaluation of the overhead in simulated and real hardware would complete the work.
+    \begin{enumerate}
+        \item Docker Swarm \& Basic Algorithm
+        \item Implement More Algorithms/ Algorithm Types
+        \begin{enumerate}
+            \item Introduced Overhead
+            \item Simulation
+            \item Real HW
+        \end{enumerate}
+    \end{enumerate}
+    \item \textbf{Wish List - To Do If Time:} \hfill \textbf{DL:} TBC
+
+        I leave this last block of work to include things we would like to have if time permits.
+    \begin{enumerate}
+        \item Support other Orchestrators (k8s for instance)
+        \item Relation w/ Fault-Tolerancy and Fault Injection
+    \end{enumerate}
+\end{enumerate}
+
+\vspace{5pt}
+
+\bibliographystyle{unsrt}
+\bibliography{biblio.bib}
+
+\end{document}
