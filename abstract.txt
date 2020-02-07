@@ -1,0 +1,3 @@
+Title: Live Migration of Distributed Container Deployments
+
+Abstract: Live migration is a technique to halt the execution of a program and resume it in the same state in a different location. It is useful for load-balancing purposes, fault-tolerance, and debugging of long-lasting processes. In this work we leverage checkpoint/restore tools to perform migrations of standalone and distributed container executions. We study different migration paradigms to minimize downtime and optimize resource usage, implement distributed checkpointing algorithms, and embed our contributions in simple Docker-cli and runc commands, making the process completely transparent to the user.
