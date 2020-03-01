@@ -8,7 +8,7 @@ set style histogram rowstacked
 set style fill solid 0.65 border -1
 set boxwidth 0.85 relative
 
-set yrange [0:2]
+set yrange [0:3]
 set xlabel "Number of Keys loaded to Redis" offset 15,0
 set ylabel "Execution Time [s]" offset 1.5, 0.0
 
