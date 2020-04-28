@@ -1,0 +1,1046 @@
+\chapter{Implementation Code Snippets} \label{chap:app-code}
+
+\section{Server-Side Algorithms}
+
+\begin{lstlisting}[language=Scala,caption={Implementation of the \texttt{SDNN} algorithm.},label=code:sdnn]
+/** Estimation of the Standard Deviation between NN intervals.
+ *                                                                
+ *  @constructor create a new estimation suite.
+ *  @param wdwSize duration in seconds of the window in which we compute
+ *  the standard deviation.
+ */                                                                   
+class EstimateSDNN(wdwSize: Int) { 
+
+  /** Estimation of the SDNN with a fixed window in streaming mode
+   *
+   *  @return returns a DStream containing a tuple per line containing the time
+   *  block/interval (starting from zero) and the SDNN value.
+   */
+  def sdnn(dataStream: DStream[String]): DStream[(String, Double)] = {
+    val operatorByKey = new StreamOperators(wdwSize)
+    operatorByKey.sumSquareByKey(dataStream)
+      .join(operatorByKey.cardinalByKey(dataStream))
+      .map(udfDivide)
+      .join(operatorByKey.avgByKey(dataStream))
+      .map(udfSqrtDif)
+      .map(udfTimesWindow)
+  }
+
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Scala,caption={Implementation of the \texttt{HRVBands} algorithm.},label=code:hrvbands]
+package org.apache.spark.csem.utils
+
+import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.csem.utils.StreamOperators
+
+import scala.math.{pow, cos, sin, Pi, floor}
+
+/** Set of signal processing operators defined on (K, V), (String, Float) 
+ *  DStreams. Currently the methods included in this suite are: DFT,
+ *
+ *  @constructor create a new operator suite. 
+ *  @param wdwSize duration in seconds of the window in which we compute
+ *  the standard deviation.
+ */
+class StreamSignalProcessing(wdwSize: Int) extends Serializable {
+
+  /** Preprocesses the input data stream (which contains lines from the csv
+   *  input file) to the following format, (k, v) where:
+   *  - k: is the 10 second block identifier (key)
+   *  - v: iterable with all the rr's from that block indexed.
+   *
+   *  @return A data stream with the specified format.
+   */
+  def preProcess(dataStream: DStream[String]):
+    DStream[(String, Iterable[(Double, Int)], Int)] = {
+      dataStream
+        .map(line => (floor(line.split(",")(0).toDouble/10).toInt.toString,
+          line.split(",")(1).toDouble))
+        .groupByKey()
+        .map(line => (line._1, line._2.zipWithIndex, line._2.size))
+  }
+
+  /** Compute the squared module of the Discrete Fourier Transform of the 
+   *  samples contained in the DStream.
+   *
+   *  @return returns a DStream containing a tuple per line containing the time
+   *  block/interval (starting from zero) and the sum of all the values
+   *  in that same interval.
+   */
+  def modDFT2(dataStream: DStream[String]):
+    DStream[(String, Double, Double, Double)] = { 
+
+    // Auxiliary methods to compute the squared modulus of the DFT
+    def cosDFT(line: (String, Iterable[(Double, Int)], Int), f_index: Int):
+      Double = {
+      line._2
+        .map(x => x._1*cos(2*Pi*x._2*f_index/line._3))
+        .reduce((a,b) => (a+b))
+    }
+    def sinDFT(line: (String, Iterable[(Double, Int)], Int), f_index: Int):
+      Double = {
+      line._2
+        .map(x => x._1*sin(2*Pi*x._2*f_index/line._3))
+        .reduce((a,b) => (a+b))
+    }
+
+    // Compute the Square Modulus of the DFT
+    def modDFT(value: (Double, Int),
+      line: (String, Iterable[(Double, Int)], Int)): (Double, Int) = {
+        (pow(cosDFT(line, value._2), 2) + pow(sinDFT(line, value._2), 2),
+          value._2)
+    }
+
+    // Predicate to know if a value belongs to the High Freq. Component
+    def isHighFreq(value: (Double, Int), cardinal: Int): Boolean = {
+      val thr_low = (0.15 * cardinal).toInt
+      val thr_high = (0.4 * cardinal).toInt
+      value._2 match {
+        case x if thr_low until thr_high contains x => true
+        case _ => false
+      }
+    }
+
+    // Predicate to know if a value belongs to the Low Freq. Component
+    def isLowFreq(value: (Double, Int), cardinal: Int): Boolean = {
+      val thr_low = (0.04 * cardinal).toInt
+      val thr_high = (0.15 * cardinal).toInt
+      value._2 match {
+        case x if thr_low until thr_high contains x => true
+        case _ => false
+      }
+    }
+
+    val tmp = preProcess(dataStream)
+      .map( l => (l._1, l._2.map( list => modDFT(list, l) ), l._3) )
+
+    // High Frequency Component
+    val highFreq = tmp
+      .map(line => (line._1, line._2
+        .filter( x => isHighFreq(x, line._3) )
+        .map( x => x._1 )
+        .foldLeft(0.toDouble)( (a,b) => (a + b) ), line._3))
+      .map( line => (line._1, line._2 / pow(line._3, 2) * 2) )
+
+    // Low Frequency Component
+    val lowFreq = tmp
+      .map(line => (line._1, line._2
+        .filter(x => isLowFreq(x, line._3))
+        .map( x => x._1 )
+        .foldLeft(0.toDouble)( (a,b) => (a + b) ), line._3))
+      .map( line => (line._1, line._2 / pow(line._3, 2) * 2) )
+    lowFreq
+      .join(highFreq)
+      .map( x => (x._1, x._2._1, x._2._2, x._2._1 / x._2._2) )
+  }
+}
+
+
+/** Estimation of the frequency bands given a HRV sequence.
+ *
+ *  @constructor create a new estimation suite.
+ *  @param wdwSize duration in seconds of the window in which we estimate
+ *  the frequency bands.
+ */
+class EstimateHRVBands(wdwSize: Int) {
+  /** Estimation of the SDNN with a fixed window in streaming mode
+   *
+   *  @return returns a DStream containing a tuple per line containing the time
+   *  block/interval (starting from zero) and the SDNN value.
+   */
+  def estimate(dataStream: DStream[String]):
+      DStream[(String, Double, Double, Double)] = {
+    val processingByKey = new StreamSignalProcessing(wdwSize)
+    processingByKey.modDFT2(dataStream)
+  }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Scala,caption={Implementation of the \texttt{Identity} algorithm.},label=code:identity]
+/** Main application/class that launches the identity application.                                                [64/180]
+ *                                                                                                                        
+ *  @note We implement the identity application that                                                 
+ *  basically does nothing. This way we will be able to measure easily the                                                
+ *  system's overhead.
+ */
+object Identity extends Logging {
+
+  def main(args: Array[String]) {
+
+    // Initialize Variables and Spark Context
+    val numClients = args(0).toInt
+    val conf = new SparkConf().setAppName("HRV Toolbox - Identity")
+    val sc = new SparkContext(conf)
+    val ssc = new StreamingContext(sc, Duration(10000))
+
+    // Map Output to Input
+    val dataStreamVec = for (i <- 1 to numClients) yield ssc.textFileStream("csem/src/main/resources/csv/"+i.toString+"/
+")
+    for (i <- 1 to numClients) {
+    dataStreamVec(i-1).saveAsTextFiles("csem/src/main/resources/results/" + i.toString + "/identity")
+    }
+
+    ssc.start()
+    ssc.awaitTermination()
+  }
+}
+\end{lstlisting}
+
+\section{Client-Side Services Source Code}
+
+\begin{lstlisting}[language=Python,caption={Implementation of the \texttt{sensor} service.},label=code:sensor]
+"""Fake MQTT Generator
+
+This module emulates a sensor that publishes data to a MQTT topic with a given
+sample rate.
+"""
+// Method names are those required to be overridden by Paho MQTT
+import paho.mqtt.publish as publish 
+import signal
+import sys
+import time
+from datetime import datetime
+from numpy import random
+
+
+// SIGTERM Signal Handler
+class Killer:
+  kill_now = False
+  def __init__(self):
+    signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+  def exit_gracefully(self, signum, frame):
+    self.kill_now = True
+
+    
+// Callback to be executed at service start up time
+def run(sample_rate):
+    if sample_rate == 0:
+        raise ZeroDivisionError("Can not set a 0 sample rate")
+    loop(int(sample_rate))
+
+
+def loop(sample_rate):
+    """Endless Sample Generation
+
+    This module is the endless loop that generates <sample_rate>
+    new samples per second and publishes them to a MQTT topic.
+
+    Parameters
+    ----------
+    sample_rate : float
+        How many samples are generated per second
+    """
+    killer = Killer()
+    global CL_ID
+    past_ts = time.time()
+    while 1:
+        value = ""
+        # First we generate <sample_rate> timestamps in one second
+        tstamps = [i for i in random.uniform(low=time.time(),
+                                             high=time.time() + 1,
+                                             size=(sample_rate))]
+        tstamps.sort()
+        # Second we compute the intervals between them
+        for i in tstamps:
+            tmp = datetime.fromtimestamp(i).strftime('%Y-%m-%d %H:%M:%S')
+            value += tmp+','+str(int((i - past_ts) * 1e6))+'\n'
+            past_ts = i
+        publish.single("artificial-data-{}".format(CL_ID), value)
+        time.sleep(1)
+        if killer.kill_now:
+            print("Exitting gracefully!")
+            break
+
+
+if __name__ == "__main__":
+    """Standalone entry point"""
+    if len(sys.argv) < 2:
+        raise TypeError("No Sample Rate provided")
+    CL_ID = sys.argv[2]
+    run(sys.argv[1])
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python,caption={Implementation of the \texttt{mqtt-subscriber} service.},label=code:mqtt-sub]
+"""MQTT Subscriber and CSV Generator
+
+This module subscribes to the data topic in a MQTT queue and, whenever it
+stacks a given amount of samples it generates a new csv file.
+
+Attributes
+----------
+count : int
+    Global counter.
+curr_str : str
+    Global string accumulator.
+"""
+import paho.mqtt.client as mqtt
+from datetime import datetime
+import time
+import signal
+import sys
+import os
+
+
+count = 0
+curr_str = ""
+
+
+class Killer:
+  kill_now = False
+  def __init__(self):
+    signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+  def exit_gracefully(self, signum, frame):
+    self.kill_now = True
+
+
+def on_message(mosq, obj, msg):
+    """Callback method for the mosquitto client.
+
+    Whenever the MQTT client receives a new sample it triggers this method.
+    When the current count reaches the threshold, a new csv file is generated
+    and stored in the local data directory.
+
+    Parameters
+    ----------
+    Parameters are those of the standard implementation of the MQTT client
+    for Python.
+    """
+    global count
+    global curr_str
+    global FILE_LINES
+    global CL_ID
+    global LOCAL_DATA_DIR
+    global killer
+    print("Received message")
+    dcd_msg = msg.payload.decode("utf-8").split("\n")
+    whole_msg = [i.split(",") for i in dcd_msg if i != ""] 
+    for tmp in whole_msg:
+        d = datetime.strptime(tmp[0], '%Y-%m-%d %H:%M:%S')
+        time_stamp = time.mktime(d.timetuple())
+        rr = tmp[1]
+        if count == FILE_LINES:
+            global TS
+            print("It took: {} s".format(time.time() - TS))
+            curr_str += "{},{}".format(time_stamp, rr)
+            ts = int(time.time()*1e3)
+            filename = "{}{}_".format(LOCAL_DATA_DIR, CL_ID)+str(ts)+".csv"
+            try:
+                with open(filename, "w+") as f:
+                    f.write(curr_str)
+            except FileNotFoundError as e:
+                if killer.kill_now:
+                    mosq.disconnect()
+                    print("Exitting gracefully!")
+                    break
+            count = 0
+            curr_str = ""
+        else:
+            curr_str += "{},{}\n".format(time_stamp, rr)
+            count += 1
+    else:
+        if killer.kill_now:
+            mosq.disconnect()
+            print("Exitting gracefully!")
+
+
+def start_mqtt():
+    """Start the MQTT client"""
+    global CL_ID
+    mqttc = mqtt.Client()
+    mqttc.on_message = on_message
+    mqttc.connect("localhost", port=1883)
+    mqttc.subscribe("artificial-data-{}".format(CL_ID))
+    mqttc.loop_forever()
+
+
+if __name__ == "__main__":
+    """Standalone execution entry point"""
+    try:
+        FILE_LINES = int(sys.argv[1])
+    except IndexError as e:
+        print("Have not provided a FILE_LINES value!")
+        sys.exit(1)
+    killer = Killer()
+    CL_ID = sys.argv[2]
+    LOCAL_DATA_DIR = sys.argv[3]
+    start_mqtt()
+    TS = time.time()
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python,caption={Implementation of the \texttt{producer} service.},label=code:producer]
+"""CSV Producer
+
+This module monitors a local data directory and perodically sends the newly
+added csv files to a remote directory in order to be processed.
+
+Attributes
+----------
+"""
+import os
+import time
+import signal
+import sys
+from paramiko import SSHClient, SSHConfig, ProxyCommand, SFTPClient
+from paramiko.util import log_to_file
+from server_connect import server_connect
+
+
+class Killer:
+  kill_now = False
+  def __init__(self):
+    signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+  def exit_gracefully(self, signum, frame):
+    self.kill_now = True
+
+
+def monitor(ssh, sftp, *args):
+    """Sending daemon
+
+    This method starts an infinite loop that every <SEND_PERIOD> looks for
+    newly added data files and copies them to a remote directory.
+
+    Parameters
+    ----------
+    ssh : paramiko.SSHClient
+        SSH Client connected to the remote host.
+    sftp : paramiko.SFTPClient
+        SFTP Client connected to the remote host.
+    """
+    global LOCAL_DATA_DIR
+    path_to_watch = LOCAL_DATA_DIR
+    before = dict([(f, None) for f in os.listdir(path_to_watch)])
+    global SEND_PERIOD
+    killer = Killer()
+    while 1:
+        time.sleep(SEND_PERIOD)
+        after = dict([(f, None) for f in os.listdir(path_to_watch)])
+        added = [f for f in after if f not in before]
+        if added:
+            for f in added:
+                local_file = LOCAL_DATA_DIR + str(f)
+                global REMOTE_DATA_DIR
+                remote_file = REMOTE_DATA_DIR + "/" + str(f)
+                sftp.put(local_file, remote_file)
+                os.remove(local_file)
+                # If there are a lot of files, not checking inside also leads
+                # to error with code 137
+                if killer.kill_now:
+                    print("Exitting gracefully!")
+                    break
+        before = after
+        if killer.kill_now:
+            print("Exitting gracefully!")
+            break
+    for d in os.listdir(LOCAL_DATA_DIR):
+        tmp_file = LOCAL_DATA_DIR + str(d)
+        os.remove(tmp_file)
+
+
+if __name__ == "__main__":
+    """Standalone entry point
+
+    The scripts is executed as a subprocess and as a consequence in standalone
+    mode. This is done to prevent it from blocking the rest of the execution
+    and to prevent from working with Python's threading library.
+    """
+    ssh, sftp = server_connect()
+    LOCAL_DATA_DIR = sys.argv[1]
+    REMOTE_DATA_DIR = sys.argv[2]
+    SEND_PERIOD = int(sys.argv[3])
+    sftp.mkdir(REMOTE_DATA_DIR)
+    monitor(ssh, sftp)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python,caption={Implementation of the \texttt{consumer} service.},label=code:consumer]
+"""Result Consumer Daemon
+
+This module periodically fetches data from a remote directory containing the
+results of the computation and copies them over SFTP to a local directory.
+
+Attributes
+----------
+FETCH_PERIOD : int
+    How often does the module fetch the newly generated directories.
+"""
+import os
+import getpass
+import sys
+import time
+import signal
+from paramiko import SSHClient, SSHConfig, ProxyCommand, SFTPClient
+from paramiko.util import log_to_file
+from server_connect import server_connect
+
+
+class Killer:
+  kill_now = False
+  def __init__(self):
+    signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+  def exit_gracefully(self, signum, frame):
+    self.kill_now = True
+
+
+def get_all(sftp, remote_dir, local_dir):
+    """Copy a whole directory
+
+    The aim of this module is to emulate the -r option in scp. Note that this
+    is not recursive and only works in a folder with a known and given
+    structure.
+
+    Parameters
+    ----------
+    sftp : paramiko.SFTPClient
+        SFTP Client connected to the remote host.
+    remote_dir : str
+        Path of the directory we are copying from.
+    local_dir : str
+        Path of the directory we are copying to.
+    """
+    for f in sftp.listdir(remote_dir):
+        remote_file = remote_dir + str(f)
+        if (not f.startswith('.')) and (not f.startswith('_')):
+            local_file = local_dir + str(f)
+            sftp.get(remote_file, local_file)
+
+
+def monitor(ssh, sftp):
+    """Fetching daemon
+
+    This method starts an infinite loop that every <FETCH_PERIOD> looks for
+    newly added directories and copies them to a local result directory.
+
+    Parameters
+    ----------
+    ssh : paramiko.SSHClient
+        SSH Client connected to the remote host.
+    sftp : paramiko.SFTPClient
+        SFTP Client connected to the remote host.
+    """
+    global REMOTE_RESULT_DIR
+    global FETCH_PERIOD
+    global LOCAL_RESULT_DIR
+    #print("CONSUMER: user -> {}".format(getpass.getuser()))
+    path_to_watch = REMOTE_RESULT_DIR
+    before = dict([(f, None) for f in sftp.listdir(path_to_watch)])
+    killer = Killer()
+    while 1:
+        time.sleep(FETCH_PERIOD)
+        after = dict([(f, None) for f in sftp.listdir(path_to_watch)])
+        added = [f for f in after if f not in before]
+        if added:
+            for f in added:
+                local_dir = LOCAL_RESULT_DIR + str(f) + "/"
+                remote_dir = REMOTE_RESULT_DIR + "/" + str(f) + "/"
+                try:
+                    os.mkdir(local_dir)
+                    get_all(sftp, remote_dir, local_dir)
+                except FileExistsError as e:
+                    print("Fetching a file that already exists!")
+        before = after
+        if killer.kill_now:
+            print("Exitting gracefully!")
+            break
+    for d in os.listdir(LOCAL_RESULT_DIR):
+        tmp_dir = LOCAL_RESULT_DIR + d
+        for f in os.listdir(tmp_dir):
+            tmp_file = tmp_dir + "/" + f
+            os.remove(tmp_file)
+        os.rmdir(tmp_dir)
+
+
+if __name__ == "__main__":
+    """Standalone entry point
+
+    The scripts is executed as a subprocess and as a consequence in standalone
+    mode. This is done to prevent it from blocking the rest of the execution
+    and to prevent myself from working with Python's threading library.
+    """
+    ssh, sftp = server_connect()
+    LOCAL_RESULT_DIR = sys.argv[1]
+    REMOTE_RESULT_DIR = sys.argv[2]
+    sftp.mkdir(REMOTE_RESULT_DIR)
+    FETCH_PERIOD = int(sys.argv[3])
+    monitor(ssh, sftp)
+\end{lstlisting}
+\section{Deployment Scripts}
+
+\begin{lstlisting}[language=Python,caption={Server-Side Deployment Script.},label=code:deployment:server]
+#!/usr/bin/python3
+"""Remote Side Standalone Launcher
+
+This module implements the remote-side, standalone, launcher.
+"""
+import os
+import sys
+import time
+import signal
+from server_connect import server_connect
+
+
+class Killer:
+  kill_now = False
+  def __init__(self):
+    signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+  def exit_gracefully(self, signum, frame):
+    self.kill_now = True
+
+
+def main(ssh, sftp):
+    """Main execution method
+
+    This method contains the main deployment of UC1. It basically starts each
+    and every process, launches the benchmarking, and cleans everything when
+    execution has finished.
+
+    Notes
+    -----
+    All the sleeps are placed due to experienced errors race conditions. As a
+    consequence their arguments are completely empirical.
+
+    Arguments
+    ---------
+    ssh : paramiko.SSHClient
+        SSH Client to the remote server.
+    sftp : paramiko.SFTPClient
+        SFTP Client to the remote server.
+    """
+    global ALGORITHM
+    global SGX_MODE
+    global NUM_CLIENTS
+    algo_name = "./launch-csem-{}.sh {}".format(ALGORITHM, NUM_CLIENTS)
+    if SGX_MODE:
+        script_list = ["./master.sh", "./worker.sh", "./worker-enclave.sh",
+                       "./driver-enclave.sh", algo_name]
+    else:
+        script_list = ["./master.sh", "./worker.sh", algo_name]
+    for script in script_list:
+        _in, _out, _err = ssh.exec_command("cd sgx-spark; {} &".format(script))
+        time.sleep(3)
+    tmp_command = "dstat -l --nocolor --noheaders 10 > cpu_load.csv"
+    _, _out, __ = ssh.exec_command("cd sgx-spark; {} &".format(tmp_command))
+    _out.readlines()
+    killer = Killer()
+    while 1:
+        time.sleep(1)
+        if killer.kill_now:
+            print("Killing Gracefully!")
+            break
+    for script in script_list:
+        _, _out, __ = ssh.exec_command("kill $(pgrep -f '{}')".format(script))
+        _out.readlines()
+    _, _out, __ = ssh.exec_command("kill $(pgrep -f 'java')")
+    _out.readlines()
+    _, _out, __ = ssh.exec_command("kill $(pgrep -f 'dstat')")
+    _out.readlines()
+    _, _out, __ = ssh.exec_command("rm /dev/shm/*")
+    _out.readlines()
+    return 0
+
+
+if __name__ == "__main__":
+    """Entry point for standalone executions
+
+    This entry point contains the command line argument parsing.
+    """
+    ssh, sftp = server_connect("/home/user/logfile.log")
+    ALGORITHM = sys.argv[1]
+    SGX_MODE = int(sys.argv[2])
+    NUM_CLIENTS = int(sys.argv[3])
+    main(ssh, sftp)
+\end{lstlisting}
+
+\begin{lstlisting}[language=docker-compose,caption={Client Docker Compose Script.},label=code:client-compose]
+version: '3'
+
+services:
+    consumer:
+        build: ./services/consumer/
+        container_name: "sgx-csem-client-consumer-${CL_ID}"
+        image: consumer:latest
+        command: "${CONTAINER_RESULT_DIR} ${REMOTE_RESULT_DIR}/${CL_ID} ${FETCH_PERIOD}"
+        user: "${myUID}:${myGID}"
+        volumes: 
+            - "/home/docker/results/${CL_ID}:${CONTAINER_RESULT_DIR}"
+              #    - "${LOCAL_RESULT_DIR}${CL_ID}:${CONTAINER_RESULT_DIR}"
+    producer:
+        build: ./services/producer/
+        container_name: "sgx-csem-client-producer-${CL_ID}"
+        image: producer:latest
+        command: "${CONTAINER_DATA_DIR} ${REMOTE_DATA_DIR}/${CL_ID} ${SEND_PERIOD}"
+        volumes: 
+            - "/home/docker/data/${CL_ID}:${CONTAINER_DATA_DIR}"
+              #- "${LOCAL_DATA_DIR}${CL_ID}:${CONTAINER_DATA_DIR}"
+    mqtt-sub:
+        build: ./services/mqtt_sub/
+        container_name: "sgx-csem-client-mqtt-sub-${CL_ID}"
+        image: mqtt-sub:latest
+        network_mode: "sgx-csem-net"
+        user: "${myUID}:${myGID}"
+        depends_on: 
+            - "mqtt"
+        volumes: 
+            - "/home/docker/data/${CL_ID}:${CONTAINER_DATA_DIR}"
+              #- "${LOCAL_DATA_DIR}${CL_ID}:${CONTAINER_DATA_DIR}"
+        command: "${FILE_LINES} ${CL_ID} ${CONTAINER_DATA_DIR}"
+    fake-sensor:
+        build: ./services/fake-sensor/
+        container_name: "sgx-csem-client-fake-sensor-${CL_ID}"
+        image: fake-sensor:latest
+        network_mode: "sgx-csem-net"
+        command: "${SAMPLE_RATE} ${CL_ID}"
+        depends_on: 
+            - "mqtt"
+    mqtt:
+        image: eclipse-mosquitto
+        container_name: "sgx-csem-mqtt-${CL_ID}"
+        network_mode: "sgx-csem-net"
+        logging:
+            driver: none
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python,caption={Benchmarking and Experiment Deployment Script.},label=code:deployment:experiments]
+#!/usr/bin/python3
+"""Benchmarking and Evaluation launcher.
+
+This module includes all the diferent benchmarking scenarions considered in the
+project. It also deploys all of them in a sequential fashion.
+"""
+import itertools
+import sys
+import os
+import time
+import subprocess
+from datetime import datetime
+import requests
+import glob
+import shutil
+from server_connect import server_connect
+
+
+def query_batch_processing(filedir):
+    """Query Spark's REST API 
+    This method queries sparks API for the batch processing time. It firsts
+    launches a port forwarding daemon in order to be able to perform the
+    request and then queries the information. Note that this is done only
+    once at the end of the execution (right before killing it).
+    """
+    proc = subprocess.Popen("python3 port_forward.py".split(" "))
+    time.sleep(2)
+    app_id = requests.get('http://localhost:4040/api/v1/applications/').json()
+    app_id = app_id[0]['id']
+    req = 'http://localhost:4040/api/v1/applications/{}/jobs/'.format(app_id)
+    r = requests.get(req).json()
+    time_format = "%Y-%m-%dT%H:%M:%S.%f"
+    times = [ datetime.strptime(r[i]['completionTime'][:-3],
+                                time_format).timestamp() -
+              datetime.strptime(r[i]['submissionTime'][:-3],
+                                time_format).timestamp()
+              for i in reversed(range(len(r))) if 'completionTime' in r[i] ]
+    proc.kill()
+    filename = filedir + "batch_processing_times.csv"
+    with open(filename, "w+") as f:
+        for num, val in enumerate(times):
+            if num == 0:
+                f.write("{} {}".format(num, val))
+            else:
+                f.write("\n{} {}".format(num, val))
+    return 0
+
+
+def query_energy(filedir, elapsed_time = 0, energy_ini = 0):
+    """ Query UniNe's Powe Control System
+
+    The idea is to compute consumed energy vs runtime so this are the values
+    that we will pack. For further reference below are the values to query
+    for other things.
+    pdu_val   |   variable measured
+       1      |   Voltage AC rms (V)
+       2      |   Current AC rms (A)
+       8      |   Total energy active (kWh)
+      10      |   Resettable energy (?) active (kWh)
+    DISCLAIMER: The current result is in kWh!
+    """
+    port_fw = "python3 port_forward.py"
+    port_fw += " -lp 8080 -ru powercontrol.maas -rp 80 -rh hoernli-2"
+    proc = subprocess.Popen("{}".format(port_fw).split(" "))
+    time.sleep(2)
+    req = 'http://localhost:8080/statusjsn.js?components=16384'
+    # In this case we choose value 8 -> Energy
+    r = requests.get(req).json()['sensor_values'][1]['values'][3][8]['v']
+    # Obtain teh shit
+    # subprocess.call("kill $(pgrep -f '{}')".format(port_fw), shell=True)
+    proc.kill()
+    if energy_ini:
+        filename = filedir + "energy_consumption.csv"
+        with open(filename, "w+") as f:
+            f.write("{} {}\n".format(elapsed_time, float(r) - energy_ini))
+    else:
+        return float(r)
+
+
+def query_memory(filedir):
+    ssh, sftp = server_connect("./logfile.log")
+    local_file = filedir + "cpu_load.csv"
+    remote_file = "/home/ubuntu/sgx-spark/cpu_load.csv"
+    sftp.get(remote_file, local_file)
+    sftp.remove(remote_file)
+    ssh.close()
+    sftp.close()
+
+
+# TODO: This will eventually have to change when we containerize the client
+def query_active_clients(filedir, total_clients):
+    ssh, sftp = server_connect("./logfile.log")
+    filename = filedir + "clients.csv"
+    remote_dir = "/home/ubuntu/sgx-spark/csem/src/main/resources/csv/"
+    active_clients = len(set([l.split('_')[0] for l in sftp.listdir(remote_dir)]))
+    with open(filename, "w+") as f:
+        f.write("Active clients:\t {}\n".format(active_clients))
+        f.write("Total clients:\t {}\n".format(total_clients))
+    ssh.close()
+    sftp.close()
+
+
+def main():
+    """Launcher.
+
+    This method defines all the diferent benchmarking environments, the
+    parameters they take and deploys each and every execution.
+    """
+    # General variables
+    #n_versions = 1
+    #sr = [1]
+    #batch_number = 200
+    #batch_duration = 10
+
+    # Evaluation Variables
+    # Test:
+    #n_clients = [100]
+    #algorithms = ["sdnn"]
+    #mode = [1]
+    # Client Scalability:
+    #n_clients = [1, 50, 250, 500]
+    #algorithms = ["sdnn", "identity", "hrvbands"]
+    #mode = [1, 0]
+    # Maximal Throughput Many Files
+    n_versions = 1
+    sr = [100, 200, 300, 400, 500]
+    batch_number = 20
+    batch_duration = 10
+    n_clients = [1]
+    algorithms = ["sdnn"]
+    mode = [0]
+
+    for elem in itertools.product(*[algorithms, mode, sr]):
+        for version in range(n_versions):
+            for client in n_clients:
+                print("Starting execution with the following parameters:")
+                print("\t - Replica: {} of {}".format(version + 1, n_versions))
+                print("\t - Number of clients: {}".format(client))
+                print("\t - Algorithm: {}".format(elem[0]))
+                print("\t - SGX Enabled: {}".format(elem[1]))
+                print("\t - Sample Rate: {}".format(elem[2]))
+                # The dynamic file size is set so that one file is generated
+                # roughly every 10 seconds, so simply sample_rate * 10 lines.
+                fl = elem[2] * 10
+                subprocess.call("./deploy-single-evaluation.sh {} {} {} {} {}".format(
+                                 elem[0], elem[1], elem[2], client, fl).split(" "))
+                tmp = "/{}_ncli_{}_sgx_{}_sr_{}_v{}/".format(elem[0], client,
+                                                             elem[1], elem[2],
+                                                             version)
+                filedir = OUTPUT_DIR + tmp
+                os.makedirs(filedir, exist_ok=True)
+                try:
+                    energy_ini = query_energy(filedir)
+                    elapsed_time = batch_number*batch_duration
+                    time.sleep(elapsed_time)
+                    query_batch_processing(filedir)
+                    query_energy(filedir, elapsed_time, energy_ini)
+                    query_memory(filedir)
+                    query_active_clients(filedir, client)
+                except Exception as e:
+                    print("An exception occured during the data grepping!")
+                    print(e)
+                finally:
+                    subprocess.call("./kill-execution.sh")
+
+
+if __name__ == "__main__":
+    OUTPUT_DIR = sys.argv[1]
+    main()
+\end{lstlisting}
+
+\chapter{Evaluation Code Snippets} \label{chap:app:evaluation}
+
+\begin{lstlisting}[language=Python,caption={Python Script to Set Up a Port Forwarding Daemon.},label=code:evaluation:port-forward]
+#!/usr/bin/python3
+"""SSH Tunnel Daemon
+
+This module starts a daemon that establishes a SSH tunnel from the local box
+to the remote one. This is done to be able to query Spark's UI. It is
+essentially a local port forwarding.
+"""
+import os
+import sys
+import argparse
+import socket
+from paramiko import SSHClient, SSHConfig, ProxyCommand
+from paramiko.util import log_to_file
+from forward import forward_tunnel
+
+
+def run(**kwargs):
+    """Main method
+
+    Starts a subprocess that SSH's to the remote host and establishes the
+    tunnel/port forwarding. In short, you will see at localhost:local_port
+    the contents found at remote_url:remote_port as seen by remote_host.
+
+    Attributes
+    ----------
+    local_port : int
+        Local port towards which the connection is forwarded.
+    remote_url : str
+        Remote url you are accessing from the remote host.
+    remote_port : int
+        Port you will be accessing the remote url through.
+    remote_host : str
+        Host through which you are establishing the tunnel. Note that this
+        host should appear in your .ssh/config and, due to particularities
+        of the implementation, it must include a ProxyCommand to be used.
+    """
+    ssh = SSHClient()
+    ssh_config = SSHConfig()
+    ssh.load_system_host_keys()
+    with open(os.path.expanduser("~/.ssh/config")) as f:
+        ssh_config.parse(f)
+    try:
+        details = ssh_config.lookup(kwargs['remote_host'])
+    except Exception as e:
+        logger.error("The remote host {} is not listed in your .ssh/config" +
+                     " file!".format(kwargs['remote_host']))
+    log_to_file("logfile.log")
+    ssh.connect(hostname=details['hostname'], username=details['user'],
+                sock=ProxyCommand(details['proxycommand']))
+    forward_tunnel(kwargs['local_port'], kwargs['remote_url'],
+                   kwargs['rem_port'], ssh.get_transport())
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-lp", "--local_port", help="Local forwarded port",
+                        type=int, nargs='?', default=4040, const=4040)
+    parser.add_argument("-ru", "--remote_url", help="End URL (from remote)",
+                        type=str, nargs='?', default='localhost',
+                        const='localhost')
+    parser.add_argument("-rp", "--rem_port", help="Remote used port", type=int,
+                        nargs='?', default=4040, const=4040)
+    parser.add_argument("-rh", "--remote_host", help="Remote host", type=str,
+                        nargs='?', default="eiger-9", const="eiger-9")
+    args = parser.parse_args()
+    run(**vars(args))
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python,caption={Python Script to Set Up a SSH Tunnel.},label=code:evaluation:forward-tunnel]
+#!/usr/bin/env python
+
+# Copyright (C) 2003-2007  Robey Pointer <robeypointer@gmail.com>
+#
+# This file is part of paramiko.
+#
+# Paramiko is free software; you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation; either version 2.1 of the License, or (at your option)
+# any later version.
+#
+# Paramiko is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with Paramiko; if not, write to the Free Software Foundation, Inc.,
+# 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA.
+
+"""
+Sample script showing how to do local port forwarding over paramiko.
+
+This script connects to the requested SSH server and sets up local port
+forwarding (the openssh -L option) from a local port through a tunneled
+connection to a destination reachable from the SSH server machine.
+"""
+
+import os
+import socket
+import select
+
+try:
+    import SocketServer
+except ImportError:
+    import socketserver as SocketServer
+
+import sys
+from optparse import OptionParser
+
+import paramiko
+
+
+SSH_PORT = 22
+DEFAULT_PORT = 4000
+
+
+class ForwardServer(SocketServer.ThreadingTCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class Handler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        try:
+            chan = self.ssh_transport.open_channel(
+                "direct-tcpip",
+                (self.chain_host, self.chain_port),
+                self.request.getpeername(),
+            )
+        except Exception as e:
+            return
+        if chan is None:
+            return
+
+        while True:
+            r, w, x = select.select([self.request, chan], [], [])
+            if self.request in r:
+                data = self.request.recv(1024)
+                if len(data) == 0:
+                    break
+                chan.send(data)
+            if chan in r:
+                data = chan.recv(1024)
+                if len(data) == 0:
+                    break
+                self.request.send(data)
+
+        peername = self.request.getpeername()
+        chan.close()
+        self.request.close()
+
+
+def forward_tunnel(local_port, remote_host, remote_port, transport):
+    # this is a little convoluted, but lets me configure things for the Handler
+    # object.  (SocketServer doesn't give Handlers any way to access the outer
+    # server normally.)
+    class SubHander(Handler):
+        chain_host = remote_host
+        chain_port = remote_port
+        ssh_transport = transport
+
+    ForwardServer(("", local_port), SubHander).serve_forever()
+\end{lstlisting}

@@ -1,0 +1,102 @@
+%% ENGLISH VERSION ------------------------------------------------------------
+\addcontentsline{toc}{chapter}{Abstract}
+\topskip0pt
+\vspace*{2.00cm}
+\begin{center}
+%    \large
+%    UNIVERSITAT POLIT\`ECNICA DE CATALUNYA (UPC) 
+%
+%    \normalsize
+%    Facultat de Matem\`atiques i Estad\'istica (FME)
+%
+%    Escola T\`ecnica Superior d'Enginyeria de Telecomunicaci\'o de Barcelona (ETSETB)
+%
+%    Centre de Formaci\'o Interdisciplin\`aria Superior (CFIS)
+%
+%    \vspace{0.5cm}
+%
+%    \large
+%    SWISS CENTER FOR ELECTRONICS AND MICROTECHNOLOGY (CSEM)
+%    \normalsize
+%    Embedded Software Group - Systems Division
+%    
+%    \vspace{0.5cm}
+
+    \LARGE
+    \textit{\textbf{Abstract}} \label{sec:abstract}
+
+    \vspace{0.5cm}
+
+    \large
+    \textbf{Using Trusted Execution Environments for Secure Stream Processing of Medical Data}
+
+    by \textsc{Carlos Segarra Gonz\'alez}
+\end{center}
+
+\vspace{0.5cm}
+
+\normalsize
+Processing sensitive data, specially medical data produced by body sensors, on third-party untrusted clouds is particularly challenging without compromising the privacy of the users generating it. Typically, these sensors generate large quantities of continuous data in a streaming fashion. Such vast amount of information must be processed efficiently and securely, even under strong adversarial models. The recent introduction in the mass-market of consumer-grade processors with Trusted Execution Environments (TEEs), such as Intel SGX, paves the way to implement solutions that overcome less flexible approaches, such as those atop homomorphic encryption. 
+    
+This Bachelor Thesis presents a secure streaming processing system built on top of Intel SGX. To showcase the viability of this approach, we use it with a system specifically fitted for medical data. We design and fully implement a prototype system that we evaluate with several realistic datasets. Our experimental results show that our system introduces a reduced overhead to vanilla Spark while offering strong additional protection guarantees under powerful attackers and threat models.
+
+\vspace{0.5cm}
+
+\textbf{Keywords:} TEE, Trusted Hardware, Stream Processing, Intel SGX, Spark
+
+\vfill
+\pagebreak
+
+%% CATALAN VERSION ------------------------------------------------------------
+\topskip0pt
+\vspace*{2cm}
+\begin{center}
+%    \large
+%    UNIVERSITAT POLIT\`ECNICA DE CATALUNYA (UPC) 
+%
+%    \normalsize
+%    Facultat de Matem\`atiques i Estad\'istica (FME)
+%
+%    Escola T\`ecnica Superior d'Enginyeria de Telecomunicaci\'o de Barcelona (ETSETB)
+%
+%    Centre de Formaci\'o Interdisciplin\`aria Superior (CFIS)
+%
+%    \vspace{0.5cm}
+%
+%    \large
+%    SWISS CENTER FOR ELECTRONICS AND MICROTECHNOLOGY (CSEM)
+%    \normalsize
+%    Embedded Software Group - Systems Division
+%    
+%    \vspace{0.5cm}
+%
+    \LARGE
+    \textit{\textbf{Resum}} 
+
+    \vspace{0.5cm}
+
+    \large
+    \textbf{Using Trusted Execution Environments for Secure Stream Processing of Medical Data}
+
+    per \textsc{Carlos Segarra Gonz\'alez}
+\end{center}
+
+\vspace{0.5cm}
+
+\normalsize
+
+El processat de dades de car\`acter personal, especialment aquelles provinents de dominis m\`edics, en servidors remots al n\'uvol, \'es particularment delicat quan es vol preservar la privacitat dels usuaris que les generen.
+Molt habitualment, aquestes dades provenen de petits sensors que l'usuari du posats i que emeten un flux continu de mesures.
+Dit volum de mesures no nom\'es han de ser processades de manera eficient, sin\'o tamb\'e de manera segura, fins i tot contra hipot\`etics atacants amb acc\'es privilegiat a les m\`aquines al n\'uvol.
+La recent introducci\'o al mercat de processadors amb Entorns d'Execuci\'o Segura (\textit{Trusted Execution Environments}), com ara Intel SGX, faciliten la implementaci\'o de solucions m\'es flexibles i lleugeres que les basades en esquemes de criptografia homom\`orfica.
+    
+Aquest Treball de Final de Grau presenta una plataforma de processament segur de fluxos que es basa en Intel SGX.
+Per il{\tiny\raisebox{.9ex}{\textbullet}}lustrar la viabilitat de la plataforma, la usem en un entorn m\`edic.
+En el decurs del treball, dissenyem i implementem un sistema prototip que evaluem amb jocs de dades reals.
+Els nostres resultats experimentals mostren que la plataforma introdueix un discret ralentiment en comparaci\'o amb la implementaci\'o est\`andard de Spark, tot oferint un nivell de protecci\'o adicional per a les dades dels usuaris. 
+
+\vspace{0.5cm}
+
+\textbf{Paraules Clau:} Entorns d'Execuci\'o Segura, Computaci\'o Segura, Processament de Fluxos, Intel SGX, Spark
+
+\vfill

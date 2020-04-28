@@ -1,0 +1,124 @@
+\documentclass[12pt, twoside]{book}
+
+% Document Preamble: basic definitions and packages.
+\input{sections/preamble.tex}
+
+% List of acronyms
+\makeglossaries
+\input{sections/acronyms.tex}
+
+\begin{document}
+\onehalfspacing
+
+\frontmatter
+\pagestyle{frontmatter}
+
+% Title page
+\input{sections/front-page.tex}
+
+% Blank page after title
+\newpage
+\thispagestyle{empty}
+\null
+\vfill
+\pagebreak
+
+% Epigraph TODO choose citation
+\input{sections/epigraph.tex}
+
+% Blank page after epigraph
+\newpage
+\thispagestyle{empty}
+\null
+\vfill \pagebreak
+
+% Note from the author TODO necessary? correctly placed?
+\phantomsection
+\input{sections/note-from-author.tex}
+
+% Blank page after Note from Author
+\newpage
+\thispagestyle{empty}
+\null
+\vfill
+\pagebreak
+
+\phantomsection
+\input{sections/autorship.tex}
+
+% Blank page after Declaration of Autorship
+\newpage
+\thispagestyle{empty}
+\null
+\vfill
+\pagebreak
+
+% Acknowledgments
+\phantomsection
+\input{sections/acknowledgments.tex}
+
+% Blank page after Acknowledgments
+\newpage
+\thispagestyle{empty}
+\null
+\vfill
+\pagebreak
+
+\phantomsection
+\input{sections/abstract.tex}
+
+% Blank page after Abstract
+\newpage
+\thispagestyle{empty}
+\null
+\vfill
+\pagebreak
+
+% Table of contents: we prevent it from spanning more pages than required (default for two-paged documents is for the ToC to span a lot)
+\pagestyle{plain}
+\begingroup
+\let\cleardoublepage\clearpage
+\tableofcontents
+\endgroup
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoffigures
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Tables}
+\listoftables
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{\lstlistlistingname}
+\lstlistoflistings
+
+\glsaddall
+%\addcontentsline{toc}{chapter}{List of Acronyms}
+\printglossary[type=\acronymtype,title=List of Acronyms]
+
+\mainmatter
+\pagestyle{mainmatter}
+% Main Chapters
+\input{sections/introduction.tex}
+\input{sections/background.tex}
+\input{sections/related-work.tex} % TODO: think wether I merge this section into BG
+\input{sections/architecture.tex}
+\input{sections/implementation.tex}
+\input{sections/evaluation.tex}
+\input{sections/future-work.tex}
+\input{sections/conclusion.tex}
+
+% Bibliography: for the different bibliography styles see https://www.overleaf.com/learn/latex/Bibtex_bibliography_styles
+%\pagebreak
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\begin{appendices}
+    \input{sections/app-code.tex}
+\end{appendices}
+
+\end{document}
