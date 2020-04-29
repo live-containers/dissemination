@@ -1,2 +1,77 @@
-\chapter{Background} \label{chap:background}
+\chapter{Background Concepts} \label{chap:background}
+
+\section{Containers} \label{sec:containers}
+
+Jordi, you might add comments using \texttt{\textbackslash jg} command \jg{like this}.
+
+An Introduction to containers, what are they used for, some data, ...
+
+\subsection{An Introduction to Virtualization}
+
+Introduce the concepts of virtualization and process isolation, what is a virtual machine
+
+\subsection{Working Principles of Containers}
+
+Relatively deep dive into containers:
+
+\subsubsection*{Control Groups}
+
+\subsubsection*{Namespaces}
+
+\subsubsection*{Putting it all together}
+
+Mention the different alternatives for container runtimes
+
+\subsection{Container Orchestrators}
+
+\subsection{State-of-the-Art for Virtualization Techniques}
+
+Mention some novel techniques in the area:
+
+- Microkernels
+
+- Lightweight VM
+
+- Serverless
+
+- Cloud native
+
+\section{Checkpointing}
+
+Brief introduction, what is checkpointing
+
+\subsection{Checkpoint-Restore}
+
+\subsection{Live Migration}
+
+Iterative, pre-copy, post-copy, ... \cite{Clark2005}
+
+\subsection{Distributed Checkpointing}
+
+\section{\criu: Checkpoint Restore in Userspace}
+
+Given how heavily our project relies on CRIU, I figured out we could devote a section to it.
+Here I will depict the architecture, how it works, and who uses it, together with some of it's most important features.
+
+\subsection{A Technical Overview on \criu}
+
+\subsection{Comparison with Other C/R Tools}
+
+We can beneffit from this table:
+
+- \url{https://criu.org/Comparison_to_other_CR_projects}
+
+Compare:
+
+- VM C/R
+
+- CRIU
+
+- DMTCP
+
+- BLCR
+
+- FTI: maybe this falls a bit out of the scope \url{https://github.com/leobago/fti}
+
+We could also include snippets of how to run a Hello World for each alternative.
 

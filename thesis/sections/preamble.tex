@@ -12,12 +12,24 @@
 % Math-mode Coolness
 \usepackage{amsmath}
 
-% Custom Name Abbreviations
+% Variable Definition and Custom Commands
+\newcommand{\titleEN}{Transparent Live Migration of Distributed Container Deployments in Userspace}
 \newcommand{\projName}{\textsc{MedSpark}\xspace}
-\newcommand{\sgxspark}{\textsc{SGX-Spark}\xspace}
-\newcommand{\sgx}{\textsc{SGX}\xspace}
-\newcommand{\tz}{\textsc{TrustZone}\xspace}
-\newcommand{\arm}{\textsc{Arm}\xspace}
+\newcommand{\criu}{\textsc{CRIU}\xspace}
+
+% Comments by authors
+\usepackage{ifthen}
+\usepackage{amssymb}
+\newboolean{showcomments}
+\setboolean{showcomments}{true}
+\ifthenelse{\boolean{showcomments}}
+{ \newcommand{\mynote}[3]{
+   \fbox{\bfseries\sffamily\scriptsize#1}
+   {\small$\blacktriangleright$\textsf{\emph{\color{#3}{#2}}}$\blacktriangleleft$}}}
+{ \newcommand{\mynote}[3]{}}
+\newcommand{\jg}[1]{\mynote{Jordi}{#1}{blue}}
+\newcommand{\cs}[1]{\mynote{Carlos}{#1}{red}}
+
 
 % Graphics and TiKz
 \usepackage{graphicx}
