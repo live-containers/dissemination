@@ -1,2 +1,49 @@
-\chapter{Architecture} \label{chap:architecture}
+\chapter{\projName (think of a name for the system)} \label{chap:system}
 
+In this chapter I would present the majority of the work we have done.
+From a design perspective, implementation, and evaluation.
+
+\section{Building Blocks}
+
+My idea is to first go one-by-one the different experiments we have done, namely: iterative migration, memory deduplication, remote migration, tcp connections, ...
+The work for this part (other than the evaluation) is mostly done.
+
+For each one, present:
+\begin{itemize}
+    \item A bit of the theory behind it
+    \item A basic proof of concept (maybe even bash scripts)
+    \item Integration with \texttt{runc} and our system (yet to be named)
+    \item A micro-benchmark of this feature.
+\end{itemize}
+
+\subsection{Diskless Migration}
+
+\subsection{Iterative Migration}
+
+Again:
+\begin{itemize}
+    \item Theory
+    \item Design
+    \item Basic PoC
+    \item Integration
+    \item Evaluation \& Benchmarking
+\end{itemize}
+
+\subsubsection*{Aside: Memory Deduplication}
+
+Maybe not an aside, but putting it here to remember
+
+\subsection{Remote Migration}
+
+\subsection{Checkpointing TCP Connections}
+
+\subsubsection*{Aside: Checkpointing Established TCP Connections}
+
+\section{Checkpointing Multiple Containers}
+
+To be done.
+A necessary first step is to manage the namespaces and IPs as we do now.
+
+\section{Putting it All Together}
+
+A bit of a walkthrough of the final implementation
