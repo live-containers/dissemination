@@ -1,3 +1,45 @@
 \chapter{Implementation Code Snippets} \label{chap:app-code}
 
+\begin{lstlisting}[language=C,caption={Simple counter in C.},label=code:c-counter]
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h> /* atoi */
+#include <unistd.h>
+
+static volatile int keep_running = 1;
+
+/* Handler to graciously stop with Ctrl+C */
+void int_handler(int tmp)
+{
+    keep_running = 0;
+}
+
+/* Compile with: gcc counter.c -o counter */
+int main(int argc, char *argv[])
+{
+    int count = 0;
+    int inc = 0;
+    if (argc > 1)
+        inc = atoi(argv[1]);
+    signal(SIGINT, int_handler);
+
+    fprintf(stdout, "Current count: %i\n", count++);
+    if (inc)
+    {
+        while (keep_running)
+        {
+            fprintf(stdout, "Current count: %i\n", count++);
+            sleep(2);
+        }
+    }
+    else 
+    {
+        while (keep_running)
+            sleep(20);
+    }
+
+    return 0;
+}
+\end{lstlisting}
+
 \chapter{Evaluation Code Snippets} \label{chap:app:evaluation}
