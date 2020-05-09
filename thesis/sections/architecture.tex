@@ -55,9 +55,9 @@ Upon restore, links among successive dumps are pieced together to successfully r
 
 In order to perform a micro-benchmark of this functionality we consider two different scenarios: a simple counter written in \texttt{C} (see Listing~\ref{code:c-counter}), and a \redis in-memory database.
 For each scenario we perform two pre-dumps, and a final dump, and report the size of the \texttt{pages-1.img} file (which contains the memory dump).
-We test a static scenario in which we don't change the memory during successive dumps which acts as a baseline, and a dynamic one in which, between each dump, we modify the contents of the process memory.
-In the counter, the static scenario starts the program and goes to sleep, whereas the dynamic one indeed updates the counter every other second.
-For the database, we initially preload it with $1e7$ key-value pairs (around 300 MB of data) and then either do nothing, or run a \texttt{redis-benchmark} which alters around $1\%$ of the key pairs.
+We test a static setting in which we don't change the memory during successive dumps which acts as a baseline, and a dynamic one in which, between each dump, we modify the contents of the process memory.
+For the counter, the static setting starts the program and goes to sleep, whereas the dynamic one indeed updates the counter every other second.
+For the database, we initially pre-load it with $1e7$ key-value pairs (around 300 MB of data) and then either do nothing, or run a \texttt{redis-benchmark} which alters around $1\%$ of the key pairs.
 
 
 \subsubsection*{Aside: Memory Deduplication}
