@@ -59,6 +59,14 @@ We test a static setting in which we don't change the memory during successive d
 For the counter, the static setting starts the program and goes to sleep, whereas the dynamic one indeed updates the counter every other second.
 For the database, we initially pre-load it with $1e7$ key-value pairs (around 300 MB of data) and then either do nothing, or run a \texttt{redis-benchmark} which alters around $1\%$ of the key pairs.
 
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=.8\textwidth]{figs/iterative-migration-microbenchmark/iterative_migration_microbenchmark.pdf}
+    \caption[Size of the memory image for iterative dumps.]{Size of the dumped memory image when performing iterative dumps. For the counter experiment we report the results in kB (left axis) and for the redis one we report the results in MB (right axis). We compare the results when using \runc or purely \criu.\label{fig:iterative-migration-microbenchmark}}.
+\end{figure}
+
+We present our results in Figure~\ref{fig:iterative-migration-microbenchmark}.
+
 
 \subsubsection*{Aside: Memory Deduplication}
 
