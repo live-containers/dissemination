@@ -18,6 +18,8 @@ For each one of them we cover the theoretical concepts, the problem they try to 
 
 \cs{Describe the evaluation setting, versions etc.}
 
+\cs{Link to the github repo with the benchmarking}
+
 \subsection{Diskless Migration}
 
 \subsection{Iterative Migration}
@@ -53,11 +55,78 @@ One last key step required to achieve efficiency and correctness upon restore is
 For a pre-dump, \texttt{--prev-images-dir} indicates \criu to look for exsiting dumps in the specified path, and perform the bit-checking described in the previous paragraphs.
 Upon restore, links among successive dumps are pieced together to successfully restore the freshest version of the running program.
 
+The integration with \runc is seamless.
+The pre-dump functionality is triggered with the \texttt{--pre-dump} flag which, in turn, sets the memory tracking flag automatically~\cite{runc-memtrack}.
+Lastly, the \texttt{--parent-path} flag can be used to achieve the correct linkage between dumps.
+In Listings \ref{code:microbenchmark-iterative-criu} and \ref{code:microbenchmark-iterative-runc} we include the different scripts to perform the three consecutive dumps both in \criu and \runc.
+The complete scripts used for the benchmarking are included in Listing \ref{code:microbenchmark-iterative-evaluation}.
+\begin{figure}[h!]
+\begin{minipage}{.45\textwidth}
+\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running process using CRIU.\label{code:microbenchmark-iterative-criu}}]
+#!/bin/bash
+# First Pre-Dump
+sudo runc checkpoint \
+    --pre-dump \
+    --image-path ./images/1/ \
+    <container_name>
+
+sudo runc list # Container running
+
+# Second Pre-Dump
+sudo runc checkpoint \
+    --pre-dump \
+    --parent-path ../1/ \
+    --image-path ./images/2/ \
+    <container_name>
+
+sudo runc list # Still running
+
+# Last Dump
+sudo runc checkpoint \
+    --parent-path ../2/ \
+    --image-path ./images/3/ \
+    <container_name>
+
+# Container is now stopped
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}{.45\textwidth}
+\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running container using runC.\label{code:microbenchmark-iterative-runc}}]
+#!/bin/bash
+# First Pre-Dump
+sudo criu pre-dump \
+    -t  PROCESS_PID \
+    --images-dir images/1 \
+    --track-mem \
+    --shell-job 
+
+# Second Pre-Dump
+sudo criu pre-dump \
+    -t PROCESS_PID \
+    --shell-job \
+    --images-dir images/2 \
+    --prev-images-dir ../1 \
+    --track-mem
+
+# Last Dump
+sudo criu dump \
+    -t  PROCESS_PID \
+    --images-dir images/3 \
+    --prev-images-dir ../2 \
+    --shell-job \
+    --track-mem
+
+# Process is now stopped
+\end{lstlisting}
+\end{minipage}
+\end{figure}
+
 In order to perform a micro-benchmark of this functionality we consider two different scenarios: a simple counter written in \texttt{C} (see Listing~\ref{code:c-counter}), and a \redis in-memory database.
 For each scenario we perform two pre-dumps, and a final dump, and report the size of the \texttt{pages-1.img} file (which contains the memory dump).
 We test a static setting in which we don't change the memory during successive dumps which acts as a baseline, and a dynamic one in which, between each dump, we modify the contents of the process memory.
 For the counter, the static setting starts the program and goes to sleep, whereas the dynamic one indeed updates the counter every other second.
 For the database, we initially pre-load it with $1e7$ key-value pairs (around 300 MB of data) and then either do nothing, or run a \texttt{redis-benchmark} which alters around $1\%$ of the key pairs.
+Lastly, we compare the results of running the experiments with vanilla \criu or through \runc.
 
 \begin{figure}[h!]
     \centering
@@ -66,11 +135,20 @@ For the database, we initially pre-load it with $1e7$ key-value pairs (around 30
 \end{figure}
 
 We present our results in Figure~\ref{fig:iterative-migration-microbenchmark}.
+First of all, note how we use different scales for the counter application (left) and the \redis one (right).
+We observe that, as expected, if we make no changes to the process' memory after the first dump, the amount of information to be re-transferred is very little, which we attribute it to \criu's metadata.
+In the counter case, the initial dump is around 90 kB and subsequent ones are 12 kB, whereas in the \redis one, the size decreases from 900 MB to just 1 MB.
+Once we modify the memory, additional pages need to be transferred.
+In the counter case, between successive dumps we just increase the value of a variable and alter the state of \texttt{stdout}, what translates in a 10 kB inrease in the image size every time.
+In the \redis one, the \texttt{redis-benchmark} is non-deterministic in nature, but it's worth observing how shuffling a percent of the total key-store propagates to higher percentages of memory re-use.
+We conclude that memory tracking is a necessary feature if any application considers even near-live migration of production applications, and the technology presented allows for an easy way to do-so.
 
 
 \subsubsection*{Aside: Memory Deduplication}
 
 Maybe not an aside, but putting it here to remember
+
+\cs{Mention that before we were optimizing a-priori, wheras this technique is a-posteriori.}
 
 \subsection{Remote Migration}
 

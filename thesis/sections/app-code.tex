@@ -43,3 +43,43 @@ int main(int argc, char *argv[])
 \end{lstlisting}
 
 \chapter{Evaluation Code Snippets} \label{chap:app:evaluation}
+
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the iterative migration micro-benchmark.\label{code:microbenchmark-iterative-evaluation}}]
+#!/bin/bash
+# Run Process
+# Redis Test (Pre-loading omitted)
+redis_server --port 9999 &> /dev/null < /dev/null &
+# Counter Test
+sudo ./counter &> /dev/null < /dev/null &
+# If running with runC
+cd container-dir && sudo runc run -d container_name &> /dev/null < /dev/null & && cd -
+PID=$!
+
+# Clean Environment
+sudo ./clean.sh
+echo "Clean Done"
+
+# First pre-dump
+sudo ./pre-dump.sh ${PID}
+echo "Pre-Dump Done"
+
+# If running the Redis test, run the benchmark
+redis-benchmark -p 9999 -n 10000 &> /dev/null
+
+# Second pre-dump
+sudo ./middle-dump.sh ${PID}
+echo "Middle-Dump Done"
+
+# If running the Redis test, run the benchmark
+redis-benchmark -p 9999 -n 10000 &> /dev/null
+
+# Last Dump
+sudo ./dump.sh ${PID}
+echo "Dump Done"
+
+# Print results
+D1=$(ls -lah ./images/1/pages-1.img | awk '{ print $5; }')
+D2=$(ls -lah ./images/2/pages-1.img | awk '{ print $5; }')
+D3=$(ls -lah ./images/3/pages-1.img | awk '{ print $5; }')
+echo "Test finished: -D1: $D1 -D2: $D2 -D3: $D3"
+\end{lstlisting}
