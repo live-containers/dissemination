@@ -22,10 +22,53 @@ For each one of them we cover the theoretical concepts, the problem they try to 
 
 \subsection{Diskless Migration}
 
+As previously detailed, \criu builds the snapshot of a running process using image (\texttt{.img}) files, which are stored in a user-specified path.
+As a consequence, it relies heavily on the underlying storage facility provided by the user which, in most commodity PCs, tends to be the disk-backed filesystem.
+It is of no surprise then that reading and writing from and to disk can quickly become the bottleneck in live migration performance.
+It gets even worse when writes are duplicated, \textit{i.e.} we write once to disk to dump the process state, and a second time to transfer image files wherever they need to be restored.
+To overcome the former, we rely on \texttt{tmpfs} a virtual memory filesystem~\cite{tmpfs-manpage}.
+For the latter, we leverage \criu's \texttt{page-server}.
+
+% TMPFS
+First presented by Sun Microsystems in 2007~\cite{Snyder2007}, \texttt{tmpfs} is a memory-based file system that uses resources from the virtual memory subsystem.
+According to the Linux Programmer's Manual~\cite{tmpfs-manpage} this file system can employ swap space if memory pressure is high, only consumes as much memory as required to store the current files (regardless of the allocated size), and unmounting it destroys the contents therein.
+Since the files actually reside in memory, the user benefits from memory-like I/O performance.
+A notable use of \texttt{tmpfs} is \texttt{/dev/shm}, used the POSIX-compliant implementation of shared memory and POSIX semaphores.
+One such file system can be easily created and destroyed using \texttt{mount} and \texttt{umount} as detailed in Listing~\ref{code:tmpfs-example}
+\begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} filesystem.\label{code:tmpfs-example}}]
+#!/bin/bash
+# Mount a tmpfs filesystem rooted in the /tmp/my-tmpfs directory with maximum size 100 MB
+mkdir /tmp/my-tmpfs
+sudo mount -t tmpfs -o size=100M tmpfs /tmp/my-tmpfs
+
+# Check the new file system appears in the list of mounted devices
+sudo mount | grep /tmp/my-tmpfs
+
+# Unmount the filesystem 
+sudo umount /tmp/my-tmpfs # CAUTION: THIS WILL DESTROY THE CONTENTS
+\end{lstlisting}
+
+% Page-server
+The page server is a component of \criu that allows to send memory dumps by the network, saving disk read/writes on the origin, writing them once they reach the destination system~\cite{criu-page-server}.
+Note that the page server is used only to migrate memory files, which tend to be the largest ones, whereas other image files still need to be transferred when migrating.
+The current implementation uses only TCP sockets and no encryption nor compression is used on the network transfer.
+Observe that, even though it introduces a small overhead, our results (see Figure~\ref{fig:diskless-migration-microbenchmark}) show that for migrations within the same machine, setting up a page server in $\texttt{localhost}$ outperforms the double-copying approach for larger applications.
+
+% Integration w/ runC
+
+% Experiment
+
+% Results
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=.8\textwidth]{figs/diskless-migration-microbenchmark/diskless_migration_microbenchmark.pdf}
+    \caption[Size of the memory image for iterative dumps.]{Time elapsed checkpointing and migrating a running process when using file-based or diskless migration, with and without a page server. We compare the results for a small application (around 100 kB, left) and a big one (around 1 GB, right).\label{fig:diskless-migration-microbenchmark}}.
+\end{figure}
+
 \subsection{Iterative Migration}
 
 % Brief Introduction
-As introduced in \S
+%As introduced in \S
 
 Implemented in \criu we find a series of features that enable us to perform iterative migrations of running processes.
 This is, periodically snapshot the state of the process without altering it until some condition is triggered, that in turn checkpoints the container and restores it elsewhere.
