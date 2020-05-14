@@ -23,8 +23,8 @@ For each one of them we cover the theoretical concepts, the problem they try to 
 \subsection{Diskless Migration}
 
 As previously detailed, \criu builds the snapshot of a running process using image (\texttt{.img}) files, which are stored in a user-specified path.
-As a consequence, it relies heavily on the underlying storage facility provided by the user which, in most commodity PCs, tends to be the disk-backed filesystem.
-It is of no surprise then that reading and writing from and to disk can quickly become the bottleneck in live migration performance.
+As a consequence, it relies heavily on the underlying storage facility provided which, in most commodity PCs, tends to be the disk-backed file system.
+It is of no surprise then, that reading and writing from and to disk can quickly become the bottleneck in live migration performance.
 It gets even worse when writes are duplicated, \textit{i.e.} we write once to disk to dump the process state, and a second time to transfer image files wherever they need to be restored.
 To overcome the former, we rely on \texttt{tmpfs} a virtual memory filesystem~\cite{tmpfs-manpage}.
 For the latter, we leverage \criu's \texttt{page-server}.
@@ -52,11 +52,69 @@ sudo umount /tmp/my-tmpfs # CAUTION: THIS WILL DESTROY THE CONTENTS
 The page server is a component of \criu that allows to send memory dumps by the network, saving disk read/writes on the origin, writing them once they reach the destination system~\cite{criu-page-server}.
 Note that the page server is used only to migrate memory files, which tend to be the largest ones, whereas other image files still need to be transferred when migrating.
 The current implementation uses only TCP sockets and no encryption nor compression is used on the network transfer.
+It is also worth mentioning that \texttt{criu page-server --port} is a one-shot command.
+\textit{I.e.} if we perform multiple dumps, a page server must be started for each one of them.
 Observe that, even though it introduces a small overhead, our results (see Figure~\ref{fig:diskless-migration-microbenchmark}) show that for migrations within the same machine, setting up a page server in $\texttt{localhost}$ outperforms the double-copying approach for larger applications.
 
 % Integration w/ runC
+As introduced in the previous paragraphs, the key pieces to achieve efficient diskless migrations are making use of a \texttt{tmpfs} file system and \criu's page server.
+The former is in another level of abstraction than \runc, and for the latter we need to start the page server separately and then checkpoint passing address and port as a parameter to the \texttt{--page-server} flag.
+In Listings~\ref{code:microbenchmark-diskless-runc} and~\ref{code:microbenchmark-diskless-criu} we include snippets to perform a checkpoint with a page server using \runc and \criu respectively.
+\begin{figure}[h!]
+\begin{minipage}{.45\textwidth}
+\begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \runc using a page server.\label{code:microbenchmark-diskless-runc}}]
+#!/bin/bash
+# Start the Page Server
+sudo criu page-server \
+    --port 9999 \
+    --images-dir /path/to/dst/images &
+
+# Checkpoint using the page-server
+sudo runc checkpoint \
+    --image-path /path/to/src/images \
+    --page-server 127.0.0.1:9999 \
+    <container_name>
+
+# To finish the migration we would need to
+# copy the remaining files
+# This should be fast as memory dumps are 
+# already at destination
+cp /path/to/src/images/* \
+    /path/to/dst/images/
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}{.45\textwidth}
+\begin{lstlisting}[style=Bash,caption={Commands to perfrom a checkpoint in \criu using a page server.\label{code:microbenchmark-diskless-criu}}]
+#!/bin/bash
+# Start the Page Server
+sudo criu page-server \
+    --port 9999 \
+    --images-dir /path/to/dst/images &
+
+# Checkpoint using the page-server
+sudo runc checkpoint \
+    --image-path /path/to/src/images \
+    --page-server 127.0.0.1:9999 \
+    <container_name>
+
+# To finish the migration we would need to
+# copy the remaining files
+# This should be fast as memory dumps are
+# already at destination
+cp /path/to/src/images/* \
+    /path/to/dst/images/
+\end{lstlisting}
+\end{minipage}
+\end{figure}
 
 % Experiment
+In order to benchmark the performance of diskless migration when compared to disk-based one and the beneffits of using a page server, we set up two different experiments.
+In one hand we have a counter program written in C (see Listing~\ref{code:c-counter} for the full implementation) that increments a value and prints it to \texttt{stdout}.
+On the other hand we have an instance of a \redis in-memory database that we pre-load with $1e7$ keys.
+The total weight of the memory image dump is $912$ MB.
+For each experiment, we measure the time to checkpoint the process and transfer the remaining images to a different directory, either locally or on a different machine in the same local network.
+We compare the performance when using \texttt{tmpfs} directories to store the images (diskless) or not (file-based) and when using a page server or not.
+Each test is run 100 times and we present the average and standard deviation values obtained in Figure~\ref{fig:diskless-migration-microbenchmark}.
 
 % Results
 \begin{figure}[h!]
@@ -64,6 +122,16 @@ Observe that, even though it introduces a small overhead, our results (see Figur
     \includegraphics[width=.8\textwidth]{figs/diskless-migration-microbenchmark/diskless_migration_microbenchmark.pdf}
     \caption[Size of the memory image for iterative dumps.]{Time elapsed checkpointing and migrating a running process when using file-based or diskless migration, with and without a page server. We compare the results for a small application (around 100 kB, left) and a big one (around 1 GB, right).\label{fig:diskless-migration-microbenchmark}}.
 \end{figure}
+
+The first and most important conclusion we draw from our results is that there is no one-size-fits-all solution when choosing the best setting to migrate our application.
+It seems clear that diskless is always, equal or better than non-diskless.
+This was to be expected, as for the same setting, \texttt{tmpfs} gives better raw read/write performance.
+For instance, when transferring image files from one machine to the other, the perceived end-to-end throughput between \texttt{tmpfs} directories was in the order of 100-120 Mbps compared to the 60-70 Mbps for regular directories.
+However, there might be situations, or systems, which simply don't have that much free memory.
+For instance, the Redis dump files would already take 1 GB of memory, unacceptable in constrained devices.
+
+If the application is sufficiently small (a dump for an instance of the counter process is around 90 kB), the overhead of running a page server is higher than simply writing the file twice, both in the local and remote setting.
+However, for large applications, diskless outweighs the page server in the local case, whereas if we have to send files over the network, running a page server is more important than using the diskless approach (although a combination of both yields the best performance).
 
 \subsection{Iterative Migration}
 
@@ -105,7 +173,7 @@ In Listings \ref{code:microbenchmark-iterative-criu} and \ref{code:microbenchmar
 The complete scripts used for the benchmarking are included in Listing \ref{code:microbenchmark-iterative-evaluation}.
 \begin{figure}[h!]
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running process using CRIU.\label{code:microbenchmark-iterative-criu}}]
+\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running process using CRIU.\label{code:microbenchmark-iterative-runc}}]
 #!/bin/bash
 # First Pre-Dump
 sudo runc checkpoint \
@@ -134,7 +202,7 @@ sudo runc checkpoint \
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running container using runC.\label{code:microbenchmark-iterative-runc}}]
+\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running container using runC.\label{code:microbenchmark-iterative-criu}}]
 #!/bin/bash
 # First Pre-Dump
 sudo criu pre-dump \
@@ -164,7 +232,7 @@ sudo criu dump \
 \end{minipage}
 \end{figure}
 
-In order to perform a micro-benchmark of this functionality we consider two different scenarios: a simple counter written in \texttt{C} (see Listing~\ref{code:c-counter}), and a \redis in-memory database.
+In order to perform a micro-benchmark of this functionality we consider two different scenarios: a simple counter written in \texttt{C}, and a \redis in-memory database, as introduced in the previous section.
 For each scenario we perform two pre-dumps, and a final dump, and report the size of the \texttt{pages-1.img} file (which contains the memory dump).
 We test a static setting in which we don't change the memory during successive dumps which acts as a baseline, and a dynamic one in which, between each dump, we modify the contents of the process memory.
 For the counter, the static setting starts the program and goes to sleep, whereas the dynamic one indeed updates the counter every other second.
