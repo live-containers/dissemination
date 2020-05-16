@@ -31,9 +31,9 @@ For the latter, we leverage \criu's \texttt{page-server}.
 
 % TMPFS
 First presented by Sun Microsystems in 2007~\cite{Snyder2007}, \texttt{tmpfs} is a memory-based file system that uses resources from the virtual memory subsystem.
-According to the Linux Programmer's Manual~\cite{tmpfs-manpage} this file system can employ swap space if memory pressure is high, only consumes as much memory as required to store the current files (regardless of the allocated size), and unmounting it destroys the contents therein.
-Since the files actually reside in memory, the user benefits from memory-like I/O performance.
-A notable use of \texttt{tmpfs} is \texttt{/dev/shm}, used the POSIX-compliant implementation of shared memory and POSIX semaphores.
+According to the Linux Programmer's Manual~\cite{tmpfs-manpage}, this file system can employ swap space if memory pressure is high, only consumes as much memory as required to store the current files (regardless of the allocated size), and unmounting it destroys the contents therein.
+Since the files actually reside in memory, the user benefits from memory-like read/write performance.
+A notable use of \texttt{tmpfs} is \texttt{/dev/shm}, used in the POSIX-compliant implementation of shared memory and in POSIX semaphores.
 One such file system can be easily created and destroyed using \texttt{mount} and \texttt{umount} as detailed in Listing~\ref{code:tmpfs-example}
 \begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} filesystem.\label{code:tmpfs-example}}]
 #!/bin/bash
@@ -49,11 +49,10 @@ sudo umount /tmp/my-tmpfs # CAUTION: THIS WILL DESTROY THE CONTENTS
 \end{lstlisting}
 
 % Page-server
-The page server is a component of \criu that allows to send memory dumps by the network, saving disk read/writes on the origin, writing them once they reach the destination system~\cite{criu-page-server}.
+The page server is a component of \criu that allows to send memory dumps directly through the network, saving disk read/writes on the origin, writing them once they reach the destination system~\cite{criu-page-server}.
 Note that the page server is used only to migrate memory files, which tend to be the largest ones, whereas other image files still need to be transferred when migrating.
 The current implementation uses only TCP sockets and no encryption nor compression is used on the network transfer.
-It is also worth mentioning that \texttt{criu page-server --port} is a one-shot command.
-\textit{I.e.} if we perform multiple dumps, a page server must be started for each one of them.
+It is also worth mentioning that \texttt{criu page-server --port} is a one-shot command, \textit{i.e.} if we perform multiple dumps, a page server must be started for each one of them.
 Observe that, even though it introduces a small overhead, our results (see Figure~\ref{fig:diskless-migration-microbenchmark}) show that for migrations within the same machine, setting up a page server in $\texttt{localhost}$ outperforms the double-copying approach for larger applications.
 
 % Integration w/ runC
@@ -124,14 +123,15 @@ Each test is run 100 times and we present the average and standard deviation val
 \end{figure}
 
 The first and most important conclusion we draw from our results is that there is no one-size-fits-all solution when choosing the best setting to migrate our application.
-It seems clear that diskless is always, equal or better than non-diskless.
+It seems clear that diskless is always equal or better than non-diskless.
 This was to be expected, as for the same setting, \texttt{tmpfs} gives better raw read/write performance.
-For instance, when transferring image files from one machine to the other, the perceived end-to-end throughput between \texttt{tmpfs} directories was in the order of 100-120 Mbps compared to the 60-70 Mbps for regular directories.
+For instance, when transferring image files from one machine to the other, the perceived end-to-end throughput between \texttt{tmpfs} directories is in the order of 100-120 Mbps compared to the 60-70 Mbps for regular directories.
 However, there might be situations, or systems, which simply don't have that much free memory.
-For instance, the Redis dump files would already take 1 GB of memory, unacceptable in constrained devices.
+The Redis dump files alone already take up 1 GB of memory, unacceptable in constrained devices.
 
-If the application is sufficiently small (a dump for an instance of the counter process is around 90 kB), the overhead of running a page server is higher than simply writing the file twice, both in the local and remote setting.
+If the application is sufficiently small (a dump for an instance of the counter process is around 90 kB), the overhead of running a page server is higher than simply writing the files twice, both in the local and remote setting.
 However, for large applications, diskless outweighs the page server in the local case, whereas if we have to send files over the network, running a page server is more important than using the diskless approach (although a combination of both yields the best performance).
+We include the full evaluation scripts in Listing~\ref{code:microbenchmark-diskless-evaluation}.
 
 \subsection{Iterative Migration}
 

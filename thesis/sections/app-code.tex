@@ -44,6 +44,44 @@ int main(int argc, char *argv[])
 
 \chapter{Evaluation Code Snippets} \label{chap:app:evaluation}
 
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the diskless migration micro-benchmark using. \label{code:microbenchmark-diskless-evaluation}}]
+#!/bin/bash
+HOME=$(pwd)
+#IP=127.0.0.1
+IP=192.168.56.103
+NUM_TESTS=100
+acc=0
+acc2=0
+for (( i=1; i<=$NUM_TESTS; i++ ))
+do
+    # Choose application to run
+    #cd /home/carlos/runc-containers/counter/ && sudo ./run.sh && cd $HOME
+    cd /home/carlos/runc-containers/redis/ && sudo ./run_redis.sh 10000000 && cd $HOME
+    # Clean working Environment
+    sudo ./clean.sh
+    ssh carlos@${IP} "/home/carlos/runc-diskless/clean.sh"
+    # Start (or not) the page server
+    #sudo ./page_server.sh &
+    #ssh carlos@${IP} "/home/carlos/runc-diskless/page_server.sh &> /dev/null < /dev/null &"
+    # Start timing
+    ts=$(date +%s%N)
+    # Dump the process
+    sudo ./dump.sh
+    # Copy the remaining images
+    #scp -r ./src-images/* ./dst-images/
+    scp -r ./src-images/* carlos@${IP}:runc-diskless/dst-images/
+    time_elapsed=$((($(date +%s%N) - $ts)/1000000))
+    acc=$(($acc + $time_elapsed))
+    acc2=$(($acc2 + $time_elapsed * $time_elapsed))
+    echo "Test $i: $time_elapsed"
+done
+# Compute average and standard deviation
+avg=$(bc <<<"scale=2; $acc / $NUM_TESTS")
+std=$(bc <<<"scale=2; sqrt($acc2 / $NUM_TESTS - $avg * $avg)")
+echo "Average: $avg"
+echo "Std: $std"
+\end{lstlisting}
+
 \begin{lstlisting}[style=Bash,caption={Full evaluation script for the iterative migration micro-benchmark.\label{code:microbenchmark-iterative-evaluation}}]
 #!/bin/bash
 # Run Process
