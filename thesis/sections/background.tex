@@ -68,7 +68,7 @@ The main goal of \criu is to perform a snapshot the current process' tree state 
 
 The checkpointing process starts with the process identifier (PID) of a process group leader provided by the user through the command line using the \texttt{--tree} option~\cite{criu-checkpoint}.
 However, before it can actually start, we need to ensure that the process does not change it's state during checkpoint.
-This includes: opening file descriptors, changing sessions, or even producing new child processes~\cite{criu-feeze}.
+This includes: opening file descriptors, changing sessions, or even producing new child processes~\cite{criu-freeze}.
 To achieve this transparently, instead of sending a stop signal (which could affect the process' state) \criu freezes tasks using \texttt{ptrace}'s \texttt{PTRACE\_SEIZE} command~\cite{ptrace-manpage}.
 In order to find all active tasks descendant of the parent PID, the \texttt{\$pid} dumper iterates through each \texttt{/proc/\$pid/task/} entry, recursively gathering threads and their children from \texttt{/proc/\$pid/task/\$tid/children}.
 
@@ -77,14 +77,33 @@ File descriptors and registers are dumped through a \texttt{ptrace} interface an
 In order to dump the contents of memory and credentials, a novel technique is introduced, the \textbf{parasite code}.
 
 The parasite code is a binary blob built as a position independent executable (PIE) for execution inside another process adress space.
-It's purpose is to execute \criu calls from within the dumpee's task address space~\cite{criu-parasite}.
+It's purpose is to execute \criu calls from within the dumpee's task address space~\cite{criu-parasite-code}.
 To achieve this goal, \criu must:
 \begin{enumerate}
     \item Move task into seized state calling \texttt{ptrace(PTRACE\_SEIZE, ...)}. Note that the task is stopped without it noticing, hence not altering it's state.
-    \item Inject an \texttt{mmap} syscall in the current stack's instruction pointer, and allocate memory for the whole code blob. At this stage, space for exchanging parameters and results is also allocated within the dumpee's process adress space.
+    \item Inject an \texttt{mmap} syscall in the current stack's instruction pointer, and allocate memory for the whole code blob. At this stage, space for exchanging parameters and results is also allocated within the dumpee's process adress space. \criu is now ready to run parasite service routines.
+    \item The external dumping process retrieves information about the dumpee's adrress space through the parasite code either through \emph{trap} mode (one command at a time) or \texttt{daemon} mode (in which the parasite behavies as a UNIX socket.
+    \item With information about used memory areas and important flags read from \texttt{/proc/\$pid/smaps/} and \texttt{/proc/\$pid/pagemap}, the parasite code transfers the actual content outside through a set of pipes, which in turn gets translated into image files.
 \end{enumerate}
+Lastly, the target process is cured from the parasite by closing it, unmapping it's allocated memory area, and reverting to the original frozen state.
 
 \subsubsection*{Restore}
+
+During the restore process, \criu morphs into the to-be-restored task.
+Since we checkpoint process trees rather than single processes, \criu must \texttt{fork} itself several times to recreate the original PID tree.
+In particular, and in order to be completely transparent, \criu requires that the restored tasks have the same PID they had before dump.
+To achieve this goal, older versions of \criu had to perform very time-sensitive and race condition-prone PID handling, what was referred to as the PID dance~\cite{Reber2019,criu-pid-dance}.
+Starting with kernel 5.3 and the new \texttt{clone3()} system call, it becomes now possible to clone a process and specify the desired PID for it~\cite{kernel-clone3}.
+
+Then \criu restores all basic task resources such as file descriptors, namespaces, maps, ...
+The only resources that are \emph{not} restored at this stage are, most notably, memory mappings.
+In order to restore memory areas, and since the morphing is done \textit{in-place}, before exitting \criu would have to unmap itself and map the application code.
+To overcome this issue, a similar approach to the parasite code one is followed, the \textbf{restorer blob}.
+The restorer blob is a piece of PIE code, to which \criu transfers control to unmap itself and map the appropriate code and memory areas for the process to restore successfully.
+
+\subsubsection*{Live Migration with Criu}
+
+TO-DO
 
 \subsection{Comparison with Other C/R Tools}
 
