@@ -8,37 +8,122 @@ An Introduction to containers, what are they used for, some data, ...
 
 \subsection{An Introduction to Virtualization}
 
-Introduce the concepts of virtualization and process isolation, what is a virtual machine
+Virtualization is a recurrent technique in systems design in computer science which aims to provide processes the illusion that they interact with a defined interface, hiding the real implementation behind.
+Some of the most relevant features facilitated by virtualization are: process isolation from other processes and the underlying system, fine-grained dynamic resource provisioning, multiple virtually dedicated subsystems on the same physical instance, among others.
+We classify virtualization techniques according to the type of interface being virtualized.
+
+\textbf{Emulation.}
+Emulators allow applications written for a certain computer architecture to run on a different one.
+They do so by translating (\textit{i.e.} virtualizing) the Instruction Set Architecture (ISA).
+An example of such a system is \textsc{Qemu} (\url{https://www.qemu.org/}).
+
+\textbf{Hardware Virtualization.}
+Hardware virtualization interfaces a complete system which enables to run a fully-featured operating system within a different one.
+It has traditionally been one of the most user-friendly virtualization tools in the form of \emph{virtual machines} such as the Linux-Kernel Virtual Machine \textsc{KVM} (\url{https://www.linux-kvm.org/page/Main_Page}, \textsc{VMWare Workstation} (\url{https://www.vmware.com/}) or Oracle's \textsc{VirtualBox} (\url{https://www.virtualbox.org/}).
+We differentiate between full virtualization and paravirtualization.
+The former adds an hypervisor or virtual machine monitor (VMM) which creates the illusion of multiple virtual machines, which are multiplexed across the physical resources, and allow to run an \emph{unmodified} guest OS.
+The latter modifies the guest OS' source code and replaces sensitive calls with \emph{hypercalls}, which are direct calls to the hypervisor.
+
+\textbf{OS-level Virtualization.}
+Operating Sytem-level virtualization allows for multiple isolated user-space instances, called \textbf{containers} which share a single operating system.
+In comparison to traditional virtual machines, containers add little overhead, require minimal startup, and have a low resource requirement, all this factors make them highly scalable.
+Containers have experienced an exponential increase in usage, specially with the advent of open-source highly-available container engines such as \textsc{Docker} (\url{https://www.docker.com/}), Linux Containers \textsc{LXC} (\url{https://linuxcontainers.org/}), \textsc{Podman} (\url{https://podman.io/}, among others.
+Given that the goal of this project is to perform efficient live migration of running containers, the following section provides further technical details on containerization.
 
 \subsection{Working Principles of Containers}
 
-Relatively deep dive into containers:
-
-\subsubsection*{Control Groups}
+As previously introduced, a linux container is a set of processes that are isolated from the rest of the machine.
+To achieve this isolation, they rely on two kernel features: control groups and namespaces~\cite{namespaces-manual}.
 
 \subsubsection*{Namespaces}
 
-\subsubsection*{Putting it all together}
+As greatly phrased by Michael Kerrisk in his series of articles on namespaces~\cite{Kerrisk2013}, the purpose of namespaces is to wrap a global system resource and abstract it in a way that each process within the namespace thinks it has its own isolated instance of such resource.
+As of Kernel 5.6, there are eight different types of namespaces, which we present together with a brief description and their respective flag in Table~\ref{table:namespaces}.
+\begin{table}[h!]
+    \centering
+    \rowcolors{1}{gray!20}{}
+    \begin{tabular}{p{2cm}p{13cm}}
+        \hline
+        \textbf{Kind} & \textbf{Description} \\[3pt]
+        \hline \hline
+        \texttt{mnt} & \textbf{Mount namespaces} provide isolation of the list of mount points seen by the process in each namespace instance. It allow processes to have their own root file system and mount and unmount file systems without affecting the rest of the system. \\[3pt]
+        \texttt{pid} & The \textbf{process ID} isolates the PID number space. This means that two processes in different PID namespaces can have the same identifier. It is very useful in container migration as it allows to restore the processes with the same PID they were dumped with regardless of whether that ID might be taken in the target machine or not. \\[3pt]
+        \texttt{net} & \textbf{Network namespaces} provide isolation of the whole network stack. In particular network devices, interfaces, routing tables, iptables rules, and sockets. \\[3pt]
+        \texttt{ipc} & The \textbf{Interprocess Comunication namespace} provides isolation for POSIX semaphore queues, semaphore sets and shared memory segments.\\[3pt]
+        \texttt{uts} & The \textbf{UNIX Time Sharing namespace} allows processes to set a hostname or domainname for that particular namespace without affecting the rest of the system. \\[3pt]
+        \texttt{user} & \textbf{User namespaces} isolate security-related identifiers such as user and group identifiers (UID, GID) and capabilities. This allows for a process to have privileges within a certain namespace but not outside it's scope. \\[3pt]
+        \texttt{cgroup} & The \textbf{Control Group namespace} virtualizes the contents of \texttt{/proc/self/cgroup}. As a consequence each different namespace has a different cgroup root directory.\\[3pt]
+        \texttt{time} & The \textbf{time namespace} has been the latest addition to the group. Included in Kernel 5.6, it allows different namespaces to have different offsets to the system monotonic and boot-time clock.\\[3pt]
+        \hline
+    \end{tabular}
+    \caption{List of the different namespaces supported in Kernel 5.6. and a brief description of the isolation they provide.\label{table:namespaces}}
+\end{table}
+In order to create a new namespace of a given time, we can follow two approaches.
+With the \texttt{clone} system call, we can create a new child process, in a similar way to \texttt{fork} but with higher control of what pieces of execution context are inherited~\cite{clone-manual}.
+More specifically, with the \texttt{unshare} system call we can specifically unshare a namespace from parent process~\cite{unshare-manual}.
+To join an existing namespace, we can use the \texttt{setns} syscall, which given a file descriptor referring to a namespace, it links the calling process to it.~\cite{setns-manual}.
+These operations require the \texttt{CAP\_SYS\_ADMIN} capability.
+In Listings~\ref{code:namespaces-unshare} and~\ref{code:namespaces-setns} we include examples of usage of \texttt{unshare} and \texttt{setns} respectively.
+\begin{figure}[h!]
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[language=C,caption={Snippet to unshare the calling thread from a namespace using the \texttt{unshare} system call.\label{code:namespaces-unshare}}]
+#define _GNU_SOURCE
+#include <errno.h>
+#include <sched.h>
+#include <stdio.h>
 
-Mention the different alternatives for container runtimes
+// Unshare from parent namespace
+int main(int argc, char *argv[])
+{
+    /* Available flags:
+     * CLONE_NEWCGROUP, CLONE_NEWIPC
+     * CLONE_NEWNS, CLONE_NEWNET
+     * CLONE_NEWPID, CLONE_NEWTIME
+     * CLONE_NEWUTS, CLONE_NEWUSER
+     */
+    flags = CLONE_NEWNET || CLONE_NEWPID;
 
-\subsection{Container Orchestrators}
+    if (unshare(flags) == -1)
+    {
+        perror("unshare failed");
+        exit(EXIT_FAILURE);        
+    }
 
-\jg{We are not focusing on orchestrators in the thesis, so this section might not be necessary. In fact, their support for checkpointing and migration depends on the underlying containerization engine and, as far as I know, none of them exploits this functionality. Orchestrators might have a relevant role for distributed checkpointing (we could mention this), but again, I am not aware of any orchestrator providing that. We might do some investigation to confirm.}
+    return 0;
+}
+\end{lstlisting}
+    \end{minipage} \hfill
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[language=C,caption={Scripts to perfrom two pre-dumps and a dump of a running process using CRIU.\label{code:namespaces-setns}}]
+#define _GNU_SOURCE
+#include <errno.h>
+#include <sched.h>
+#include <stdio.h>
 
-\subsection{State-of-the-Art for Virtualization Techniques}
+// Attach calling process to an existing
+// network namespace.
+int main(int argc, char *argv[])
+{
+    // Get namespace FD
+    fd = open("/proc/330/ns/net", O_RDONLY);
 
-\jg{Same comment here. I do not think this is needed as background for the thesis.}
+    // Join the namespace
+    if (setns(fd, CLONE_NEWNET) == -1)
+    {
+        perror("setns failed");
+        exit(EXIT_FAILURE);        
+    }
 
-Mention some novel techniques in the area:
+    return 0;
+}
+\end{lstlisting}
+    \end{minipage}
+\end{figure}
 
-- Microkernels
+\subsubsection*{Control Groups}
 
-- Lightweight VM
+\subsubsection*{Different Container Runtimes}
 
-- Serverless
-
-- Cloud native
 
 \section{Checkpointing}
 
