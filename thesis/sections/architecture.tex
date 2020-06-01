@@ -265,7 +265,140 @@ Maybe not an aside, but putting it here to remember
 
 \subsection{Checkpointing TCP Connections}
 
-\subsubsection*{Aside: Checkpointing Established TCP Connections}
+The ability to checkpoint established TCP connection is mainly due to the inclusion of the \texttt{TCP\_REPAIR} socket option to kernel version $3.5$~\cite{tcp-connection-repair}.
+
+Similarly to other resources and as introduced in \S\ref{chap:background}, basic information about sockets is obtained by parsing the adequate files in the \texttt{/proc} filesystem.
+However, there are some internals of active network connections (namely negotiatied parameters such as send and receive queues, and sequence numbers) that require putting the socket in the \texttt{TCP\_REPAIR} state using the \texttt{setocketopt()} syscall (note that this action requires \texttt{CAP\_NET\_ADMIN} capabilities).
+Then, if the connection is closed whilst the socket is in \texttt{TCP\_REPAIR} mode, no \texttt{FIN} nor \texttt{RST} packets are sent to the other peer, what means that his endpoint is effectively still open~\cite{Corbet12}.
+
+To re-establish the connection from the newly generated socket, the first thing to do is put it, again, in \texttt{TCP\_REPAIR} mode.
+Then, the previously dumped parameters can be set, and upon \texttt{connect()} the socket goes directly into \texttt{ESTABLISHED} mode without acknowledgment from the other end, and a \texttt{RST} packet is sent to resume communication.
+
+% TABLE FILTERING
+The last missing piece is what happens if the remote end tries to send a packet to its, seemingly open, TCP socket whilst the other peer is down.
+Were we to ignore this fact, once the packet reached our kernel this, given that the socket is closed, would send a \texttt{RST} to the other end, and our whole illusion would collapse.
+To overcome this issue, upon checkpoint we include a set of rules to the \texttt{netfilter}~\cite{netfilter} IP routing table to drop all packets.
+We include the set of rules in Table~\ref{table:iptables-rules}.
+\begin{table}[h!]
+    \centering
+    {\ttfamily 
+    \begin{tabular}{p{3cm}p{1cm}p{1cm}p{2.5cm}p{2.5cm}p{5.0cm}}
+        \multicolumn{6}{l}{Chain INPUT (policy ACCEPT)} \\[3pt]
+        target & prot & opt & source & dest & \\[3pt]
+        CRIU & all & -- & <source\_IP> & <dest\_IP> & \\[3pt]
+        & & & & & \\[3pt]
+        \multicolumn{6}{l}{Chain FORWARD (policy ACCEPT)} \\[3pt]
+        target & prot & opt & source & dest & \\[3pt]
+        & & & & & \\[3pt]
+        \multicolumn{6}{l}{Chain OUTPUT (policy ACCEPT)} \\[3pt]
+        target & prot & opt & source & dest & \\[3pt]
+        CRIU & all & -- & <source\_IP> & <dest\_IP> & \\[3pt]
+        & & & & & \\[3pt]
+        \multicolumn{6}{l}{Chain CRIU} \\[3pt]
+        target & prot & opt & source & dest & \\[3pt]
+        ACCEPT & all & -- & <source\_IP> & <dest\_IP> & mark match ! 0xc114\\[3pt]
+        DROP & all & -- & .../0 & .../0 & \\[3pt]
+    \end{tabular}
+    }
+    \caption{Output of running \texttt{iptables -t filter -L -n}.\label{table:iptables-rules}}.
+\end{table}
+
+\textbf{Efficient IP Address Re-Use}
+
+A caveat of restoring established TCP connections is that, without bringing down both peers, we can not circumvent the negotiated \texttt{IP:PORT} pairs.
+As a consequence, the same IP address and port must be available at restore time.
+Otherwise, when the remote peer receives the \texttt{RST} package it will immediately close the connection.
+Re-using an IP address is achievable using locally scoped addresses or network namespaces.
+In our experiments we tested both.
+
+Firstly, if we are migrating into a different machine (as the experiments presented below), we need to assign addresses using \texttt{ip}'s \texttt{addr} subcommands.
+In particular, we are using a \texttt{host-only}~\cite{vbox-hostonly} subnet to manage our (virtual) machines.
+
+Alternatively, we have also tested process migration within the same machine, from one network namespace to a different one.
+This situation is particularly interesting as it recreates what happens under the hood in \criu's binding for \runc, as containers rely on namespaces for isolation.
+We set up a bridge device in the host namespace, two network namespaces, and two virtual ethernet devices with one peer tied to the bridge, and the other one inside a namespace.
+Adequately setting up addresses and default gateway routes, we achieve the setup we depict in Figure~\ref{fig:veth-arch}.
+\begin{figure}[h!]
+    \centering    
+    \begin{tikzpicture}
+        % Color definition
+        \definecolor{machineBG}{RGB}{240, 242, 245}
+        \definecolor{namespaceBG}{RGB}{210, 212, 214}
+        \definecolor{bridgeBG}{RGB}{127, 130, 135}
+
+        % Host network box
+        \draw[fill=machineBG, rounded corners] (0,0) rectangle (6, 4);
+        % Network Namespace 1 and Peer
+        \draw[fill=namespaceBG, rounded corners] (0.25, 0.25) rectangle (2.75, 2.0);
+        \node at (1.5, 0.75) {\textbf{\texttt{net-ns-1}}};
+        \draw[fill=white] (0.4, 1.35) rectangle (2.6, 1.85) node[pos=.5] {\text{\texttt{netfilter}}};
+        \draw[<->, dashed] (1.5,2) -- (1.5,2.5);
+        \draw[fill=namespaceBG, rounded corners] (0.25, 2.5) rectangle (2.75, 3) node[pos=.5] {\text{\texttt{veth-peer1}}};
+        % Network Namespace 2
+        \draw[fill=namespaceBG, rounded corners] (3.25, 0.25) rectangle (5.75, 2.0);
+        \node at (4.5, 0.75) {\textbf{\texttt{net-ns-2}}};
+        \draw[fill=white] (3.4, 1.35) rectangle (5.6, 1.85) node[pos=.5] {\text{\texttt{netfilter}}};
+        \draw[<->, dashed] (4.5,2) -- (4.5,2.5);
+        \draw[fill=namespaceBG, rounded corners] (3.25, 2.5) rectangle (5.75, 3) node[pos=.5] {\text{\texttt{veth-peer2}}};
+        % Local Bridge
+        \draw[fill=bridgeBG, rounded corners] (0.25, 3.25) rectangle (5.75, 3.75) node[pos=.5] {\textbf{Local Bridge}};
+
+        % Connecting line
+        \draw[<->, dashed, very thick] (3,4) -- (3,5) node[pos=.5] {Established \hspace{5pt} TCP Socket};
+
+        % Outside network box
+        \draw[fill=machineBG, rounded corners] (0,5) rectangle (6, 6) node[pos=.5] {\textbf{Outside Network}};
+    \end{tikzpicture}
+    \caption{Architecture of three different namespaces connected through virtual ethernet pairs.\label{fig:veth-arch}}
+\end{figure}
+
+Integration with \runc is two-fold.
+For the TCP connection \criu's binding for \runc includes a \texttt{--tcp-established} flag that does most of the socket management.
+If we are interested in restoring the connection in a different machine or namespace, we must manually recreate the filter table from Table~\ref{table:iptables-rules} using the \texttt{iptables} command.
+Lastly, to restore into an existing namespace, the container must be restored with the adequate open file descriptors using \criu's \texttt{--external}~\cite{criu-external} and \texttt{--inherit-fd}~\cite{criu-inherit-fd}.
+
+\textbf{Benchmarking}
+
+In order to evaluate the impact of migrating a process with an established TCP connection, we are interested in assessing how quickly can communication resume after restore.
+
+To achieve this goal we set up the following testbed.
+We first deploy two identical virtual machines running Linux Debian with kernel version \texttt{4.19.0-6}.
+Each one has \criu version 3.13 and \runc version \texttt{1.0.0-rc8}, both built from source.
+Additionally, and in order to conduct the experiments, we make use of \texttt{iPerf3} (version \texttt{3.7+}) a network bandwidth benchmarking tool~\cite{iperf3}.
+In particular, we start an \texttt{iPerf3} client-server pair, one in each VM, and record the perceived throughput by the client.
+Each experiment is repeated running the bare processes and checkpointing them using \criu, or isolating them within a \runc container, to assess the introduced overhead.
+We measure from the client side since we are interested in dumping and restoring the server.
+This situation makes more sense from the cloud-provider/load-balancing standpoint.
+
+\textbf{Re-connection after a down period.}
+The first experiment simulates the scenario in which the server is restored some time after the dump occured.
+In particular, we let the client saturate the link for 10 seconds, then dump the server, and restore it 2 seconds later, all of which transparently to the client (whose connection is never closed).
+In Figure~\ref{fig:evaluation-downtime} we present the throughput perceived by the client as a function of time. 
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{./figs/tcp-established-downtime/tcp_established_downtime_microbenchmark.pdf}
+    \caption{Throughput perceived from the client as a function of time, when we checkpoint the server once, and restore it after two seconds. We compare the results of \criu and \runc. \label{fig:evaluation-downtime}}
+\end{figure}
+The first observation we make from the plot, is that it takes almost a full second to get the connection back to full speed.
+To understand this behaviour we must recall what is \texttt{iPerf3} actually doing.
+The client tries to saturate the link, sending as many packets as it can, and reports the measured capacity.
+As the socket is never closed, and packets are just discarded by the network filters, to the client it will be as if those packets were never acknowledged, and hence will try to retransmit them.
+The TCP protocol specifies~\cite{tcp-rfc} that the retransmission timeout must be doubled every time a packet is not acknowledged, therefore the recurrent outage of ACKs might cause the client to back-off for the perceived full second.
+This implies that checkpointing established TCP connections only makes sense in the scenario in which the service is soon going to be restored.
+The next experiment tackles the behaviour under this situation.
+
+\textbf{Reactivity to immediate restore.}
+To prove our hypothesis that the large delay after a restore is due to the protocol itself rather than our implementation, we set up an experiment in which we perform a sequence of dumps and immediate restores of the same established TCP connection.
+We again present the throughput as a function of time in Figure~\ref{fig:evaluation-reactivity}.
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{./figs/tcp-established-resolution/tcp_established_resolution_microbenchmark.pdf}
+    \caption{Throughput from the client as a function of time.\label{fig:evaluation-reactivity}}
+\end{figure}
+In this case the measured throughput downtime does not exceed $0.1$ seconds, an order of magnitude better than the previous experiment.
+This reduced value, together with the fact that the application studied is very network-intensive, makes us believe that our proposed technique is suitable for most client-server scenarios and won't have an impact in the overall quality of service.
+
+Lastly, in both Figures we observe that, albeit being the experiments running bare processes with \criu slightly faster to restore, the overhead introduced by \runc is negligible.
 
 \section{Checkpointing Multiple Containers}
 

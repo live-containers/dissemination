@@ -122,6 +122,15 @@ int main(int argc, char *argv[])
 
 \subsubsection*{Control Groups}
 
+Control groups (\texttt{cgroups}) are a resource management kernel feature that allows handling of processes in hierarchical groups.
+This way, fine-grained resource metering and limiting can be applied on a per-group basis.
+Typical resources monitored using this technique are memory, CPU usage, I/O network, ...
+
+These constraints are enforced through the usage of kernel subsystems.
+Each different subsystem, mapped to one of the resources to manage, has an independent hierarchy.
+Each process then belongs to exactly one group per subsystem.
+For instance, the memory cgroup keeps track of the pages used and imposes different limits for physical, kernel, and total memory.
+
 \subsubsection*{Different Container Runtimes}
 
 
