@@ -356,6 +356,64 @@ Integration with \runc is two-fold.
 For the TCP connection \criu's binding for \runc includes a \texttt{--tcp-established} flag that does most of the socket management.
 If we are interested in restoring the connection in a different machine or namespace, we must manually recreate the filter table from Table~\ref{table:iptables-rules} using the \texttt{iptables} command.
 Lastly, to restore into an existing namespace, the container must be restored with the adequate open file descriptors using \criu's \texttt{--external}~\cite{criu-external} and \texttt{--inherit-fd}~\cite{criu-inherit-fd}.
+In Listings~\ref{code:microbenchmark-tcp-nonetns} and~\ref{code:microbenchmark-tcp-netns} we include excerpts of snippets to checkpoint and restore a established TCP connection without or within a network namespace respectively.
+The complete scripts for the evaluation are included in Listings~\ref{code:microbenchmark-tcp-criu-downtime} and~\ref{code:microbenchmark-tcp-criu-reactivity} for \criu's downtime and reactivity experiments, and in Listings~\ref{code:microbenchmark-tcp-runc-downtime} and~\ref{code:microbenchmark-tcp-runc-reactivity} for \runc's.
+\begin{figure}[h!]
+\begin{minipage}{.45\textwidth}
+\begin{lstlisting}[style=Bash,caption={Checkpoint and restore an established TCP connection using \criu and \runc.\label{code:microbenchmark-tcp-nonetns}}]
+#!/bin/bash
+# CRIU Dump and Restore, one after the other 
+# but in the BG (not affecting time)
+(sudo criu dump \
+    -t ${SERVER_PID} \
+    --images-dir ${IMAGES_DIR} \
+    --tcp-established; \
+echo "Restoring server..."; \
+sudo criu restore \
+    --images-dir ${IMAGES_DIR} \
+    --tcp-established) &
+
+# Similarly with runC
+(sudo runc checkpoint \
+    --image-path ${IMAGES_DIR} \
+    --tcp-established \
+    eureka; \
+cd /container/directory; \
+sudo runc restore \
+    --image-path ${IMAGES_DIR} \
+    --tcp-established \
+    eureka; \
+cd ${CWD}) &
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}{.45\textwidth}
+\begin{lstlisting}[style=Bash,caption={Excerpt of a script to checkpoint a connection within an existing namespace, and inherit it on restore.\label{code:microbenchmark-tcp-netns}}]
+#!/bin/bash
+# Two namespaces with path NS_1 and NS_2
+INO_1=$(ls -iL ${NS_1} | awk '{ print $1 }')
+INO_2=$(ls -iL ${NS_2} | awk '{ print $1 }')
+exec 33< ${NS_1}
+exec 34< ${NS_2}
+
+# To checkpoint we mark as an external
+# resource both NS
+sudo criu dump \
+    -t ${PID_1} \
+    --images-dir images \
+    --tcp-established \
+    --external net[${INO_1}]:${NS_1} \
+    --external net[${INO_2}]:${NS_2}
+
+# At restore, we match the file 
+# descriptors with the NS
+sudo criu restore \
+    --images-dir images \
+    --tcp-established \
+    --inherit-fd fd[33]:${NS_1} \
+    --inherit-fd fd[34]:${NS_2} -d
+\end{lstlisting}
+\end{minipage}
+\end{figure}
 
 \textbf{Benchmarking}
 
