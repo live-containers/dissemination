@@ -56,7 +56,7 @@ As of Kernel 5.6, there are eight different types of namespaces, which we presen
         \texttt{time} & The \textbf{time namespace} has been the latest addition to the group. Included in Kernel 5.6, it allows different namespaces to have different offsets to the system monotonic and boot-time clock.\\[3pt]
         \hline
     \end{tabular}
-    \caption{List of the different namespaces supported in Kernel 5.6. and a brief description of the isolation they provide.\label{table:namespaces}}
+    \caption[List of the different namespaces supported in Kernel 5.6.]{List of the different namespaces supported in Kernel 5.6. and a brief description of the isolation they provide.\label{table:namespaces}}
 \end{table}
 In order to create a new namespace of a given time, we can follow two approaches.
 With the \texttt{clone} system call, we can create a new child process, in a similar way to \texttt{fork} but with higher control of what pieces of execution context are inherited~\cite{clone-manual}.
@@ -124,15 +124,51 @@ int main(int argc, char *argv[])
 
 Control groups (\texttt{cgroups}) are a resource management kernel feature that allows handling of processes in hierarchical groups.
 This way, fine-grained resource metering and limiting can be applied on a per-group basis.
-Typical resources monitored using this technique are memory, CPU usage, I/O network, ...
+Typical resources monitored using this technique are memory, CPU usage, I/O network, among others.
 
 These constraints are enforced through the usage of kernel subsystems.
 Each different subsystem, mapped to one of the resources to manage, has an independent hierarchy.
 Each process then belongs to exactly one group per subsystem.
 For instance, the memory cgroup keeps track of the pages used and imposes different limits for physical, kernel, and total memory.
 
-\subsubsection*{Different Container Runtimes}
+\subsection*{Container Terminology}
 
+With the rapid increase in popularity, a wide-range of terminology has also been introduced in the container ecosystem.
+These terms are commonly misused~\cite{McCarty2018} and, even though they don't cover the technical principles, are useful to differentiate the services different tools offer.
+
+A \emph{container} is the (set of) isolated Linux process.
+It is a running instance of a \emph{container image}, a (set of) files that are used locally as a mount point.
+To enhance portability and vendor interoperability, images are stored using a standardized format by the Open Container Initiative (OCI, \url{https://opencontainers.org/}), an open governance structure for container-related standards.
+The \emph{container engine} turns the image into a running container and acts as the interaction point with the user.
+However, engines don't tend to actually instantiate the containers themselves, and rather rely on a \textit{container runtime}.
+The runtime is the lower level component that interacts with the kernel, it's specification~\cite{container-runtime-specification} is also maintained and developed by the OCI.
+\runc is it's reference implementation, and our tool of choice to implement live migration.
+We have chosen to skip the engine layer and interact with the runtime as support for advanced \criu features is lacking in higher-level tools.
+
+\subsubsection*{Different Container Engines and Runtimes}
+
+Differnt container engines
+
+Different container runtimes: crun, railcar and katacontainers (no runc)
+Docker, CRI-O, and others runc.
+
+\subsubsection*{\runc: the reference runtime implementation}
+
+Originally developed at Docker, \runc is a lightweight container runtime aimed to provide low-level interaction with containers.
+In 2015~\cite{introducing-runc}, Docker open-sourced the component and transferred ownership to the Open Container Initiative (OCI), who has since then lead the project in a fashion similar to that of the Linux Foundation.
+Since then, several container engines such as \textsc{Podman} (\url{https://podman.io/}) and \textsc{CRI-O} (\url{https://cri-o.io/}) have made \runc their runtime of choice.
+
+The OCI has since then released specifications for container runtimes, engines, images, and image distribution.
+\runc is nowadays an OCI-compliant container runtime (it is, in fact, the reference implementation).
+
+Users are encouraged to interact with containers through container engines, but \runc itself provides an interface to create, run, and manage containers natively.
+Integration with \criu has to be done on a per-project basis, and \runc has the most advanced and stable integration.
+Therefore, we decided to use it to manage our containers.
+
+Running a container with \runc is slightly different than doing it in, let's say, Docker, as the user's interaction with the underlying system is more direct.
+In particular, in \runc there is no notion of \textit{images}.
+To run a container, a user must provide a specification file (\texttt{config.json}) and a root file system in a directory (\texttt{rootfs}).
+Through the specification file several low-level options such as namespaces, control groups, and capabilities can be configured.
 
 \section{Checkpointing}
 
