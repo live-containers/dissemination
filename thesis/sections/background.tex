@@ -1,10 +1,15 @@
 \chapter{Background Concepts} \label{chap:background}
 
+The main goal of this project is to implement live migration of running containers.
+It builds on the concepts of containers, checkpointing, and it's implementation in the \criu project.
+This chapter provides a detailed introduction to these concepts as they are necessary to understand the presented contributions.
+
 \section{Containers} \label{sec:containers}
 
-Jordi, you might add comments using \texttt{\textbackslash jg} command \jg{like this}.
-
-An Introduction to containers, what are they used for, some data, ...
+A linux container is a set of isolated processes with a limited view of their environment.
+They build on traditional concepts of virtualization, and provide an alternative to virtual machines (VM).
+A container is usually faster, lighter, and more flexible than a VM.
+As a consequence they are becoming the technology of choice in multi-tenant settings, such as data centers.
 
 \subsection{An Introduction to Virtualization}
 
@@ -147,10 +152,32 @@ We have chosen to skip the engine layer and interact with the runtime as support
 
 \subsubsection*{Different Container Engines and Runtimes}
 
-Differnt container engines
+There are a variety of container engines available.
+\texttt{Docker} was the company that started exploiting containers commercially.
+It is most likely the best-known tool and the main responsible to the rapid adoption of the technology.
+However, there are several alternatives.
 
-Different container runtimes: crun, railcar and katacontainers (no runc)
-Docker, CRI-O, and others runc.
+Given it's pivotal importance, we differentiate between container engines that rely on \runc as their runtime of choice, and those which don't.
+
+\textbf{\runc-based Container Engines.}
+
+Other than \texttt{Docker}, \texttt{cri-O} (\url{https://cri-o.io/}) is a container engine focused on the integration of lightweight containers with the Kubernetes orchestrator.
+\texttt{Podman} (\url{https://podman.io/getting-started/}) is another alternative to \texttt{Docker}.
+It's main distinguishing factor is that it is a \textit{daemonless} container engine.
+Lastly, \texttt{rkt} (\url{https://github.com/rkt/rkt}) is a project with pluggability, interoperability, and customization in mind.
+Unfortunately, it has reached end-of-life and is not currently maintained.
+
+\textbf{Non-\runc Container Engines.}
+
+\texttt{Katacontainers} (\url{https://katacontainers.io/}) is a container runtime that runs on lightweight virtual machines.
+This is, instead of relying on standard container isolation techniques, they use VM-native isolation (hardware-backed) to provide further security guarantees.
+In particular, each container is hypervisor-isolated, meaning two different containers have different kernels.
+\texttt{crun} (\url{https://github.com/containers/crun}) is a re-implementation of \runc in C.
+It's main focus is on performance and memory footprint.
+In both cases \texttt{crun} surpasses \runc.
+\texttt{railcar} (\url{https://github.com/oracle/railcar}) is another runtime implementation born from the idea that \textsc{Go} might not be the best programming language to implement a container runtime.
+With memory safety in mind, Oracle, the company behind \texttt{railcar}, decided to implement an OCI-compliant runtime in \textsc{Rust}.
+Unfortunately, the project is nowadays archived.
 
 \subsubsection*{\runc: the reference runtime implementation}
 
