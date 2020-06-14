@@ -1,8 +1,20 @@
 \chapter{Introduction} \label{chap:introduction}
 
-\jg{Apart from the context and motivation of the work, do not forget to include here a clear list of the objectives of the thesis}.
+\cs{This section still needs to be phrased together}
+Introduction/motivation
 
-\jg{In order to drive the explanation of Section \ref{chap:system} it could be useful if you identify here a list of requirements that the system has to fulfill (e.g. minimize downtime while migrating memory-intensive containers, keep TCP connections open, etc)}.
+The main goal of this work is to implement efficient live migration of running containers.
+The terms \textit{efficient} and \textit{live} are vague in the absence of concise metrics, and the variety of running containers is also huge, as a consquence we specify a set of objectives we want our system to fulfil.
+\begin{itemize}
+    \item Minimize downtime and resource utilization of memory-intensive applications.
+    \item Support for established TCP connections
+    \item Support for C/R of namespaces
+\end{itemize}
 
-\jg{Some master theses also include some planning and effort/cost analysis. Check if this applies for MAMME theses}.
+The contributions of this work are the following:
+\begin{itemize}
+    \item An exhaustive micro-evaluation of different \criu features, their performance, and their integration with \runc.
+    \item An open-source library for live migration of \runc containers using \criu.
+    \item An evaluation of our solution when compared to virtual machine migration.
+\end{itemize}
 

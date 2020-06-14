@@ -71,7 +71,7 @@ These operations require the \texttt{CAP\_SYS\_ADMIN} capability.
 In Listings~\ref{code:namespaces-unshare} and~\ref{code:namespaces-setns} we include examples of usage of \texttt{unshare} and \texttt{setns} respectively.
 \begin{figure}[h!]
     \begin{minipage}{.45\textwidth}
-        \begin{lstlisting}[language=C,caption={Snippet to unshare the calling thread from a namespace using the \texttt{unshare} system call.\label{code:namespaces-unshare}}]
+        \begin{lstlisting}[language=C,caption={Snippet to unshare the calling thread from a namespace using \texttt{unshare}.\label{code:namespaces-unshare}}]
 #define _GNU_SOURCE
 #include <errno.h>
 #include <sched.h>
@@ -80,14 +80,11 @@ In Listings~\ref{code:namespaces-unshare} and~\ref{code:namespaces-setns} we inc
 // Unshare from parent namespace
 int main(int argc, char *argv[])
 {
-    /* Available flags:
-     * CLONE_NEWCGROUP, CLONE_NEWIPC
-     * CLONE_NEWNS, CLONE_NEWNET
-     * CLONE_NEWPID, CLONE_NEWTIME
-     * CLONE_NEWUTS, CLONE_NEWUSER
-     */
+    // Specify the required flags
+    // (bit-wise or)
     flags = CLONE_NEWNET || CLONE_NEWPID;
 
+    // Dettach from parent namespace
     if (unshare(flags) == -1)
     {
         perror("unshare failed");
@@ -99,7 +96,7 @@ int main(int argc, char *argv[])
 \end{lstlisting}
     \end{minipage} \hfill
     \begin{minipage}{.45\textwidth}
-        \begin{lstlisting}[language=C,caption={Scripts to perfrom two pre-dumps and a dump of a running process using CRIU.\label{code:namespaces-setns}}]
+        \begin{lstlisting}[language=C,caption={Snippet to attach to an existing network namespace.\label{code:namespaces-setns}}]
 #define _GNU_SOURCE
 #include <errno.h>
 #include <sched.h>
@@ -308,27 +305,39 @@ In order to restore memory areas, and since the morphing is done \textit{in-plac
 To overcome this issue, a similar approach to the parasite code one is followed, the \textbf{restorer blob}.
 The restorer blob is a piece of PIE code, to which \criu transfers control to unmap itself and map the appropriate code and memory areas for the process to restore successfully.
 
-\subsubsection*{Live Migration with Criu}
+\subsubsection*{Live Migration with \criu}
 
-TO-DO
+As \criu operates by design on a single system, support for live migration requires further user interaction~\cite{criu-live-migration}.
+In particular, it is up to the user to ensure that the dump files are on the remote host upon restore.
+Furthermore, IP addresses used by the application in the original host, must also be available in the new one.
+With that said, \criu developers implemented \texttt{P-Haul}~\cite{criu-phaul}, a library specially targeted for live migration using \criu.
+At the time of the writing, the project is currently inactive.
+
+The most natural way to manually perform a live migration is to use the iterative approach as we will cover later.
+However, support for lazy migration and a page server is also available~\cite{criu-lazy-migration}.
+A major drawback with iterative migration is that, as explained before, \criu freezes the process while the snapshot takes place.
+As a consequence, recurrent snapshots of a memory intensive application might cause it to freeze during long periods of time.
+Lastly, and in order to prevent file duplication, it is encouraged to use a technique called diskless migration~\cite{criu-diskless} - which we will cover in detail in \S\ref{chap:system}.
 
 \subsection{Comparison with Other C/R Tools}
 
-We can beneffit from this table:
+The main differences between C/R tools are the way they interact with the kernel and the type of applications they target.
+\criu is implemented completely in userspace, and as a consequence relies heavily on existing kernel interfaces, otherwise execution fails.
+Additionally, \criu's target application are containers.
 
-- \url{https://criu.org/Comparison_to_other_CR_projects}
+Other open-source tools that implement C/R are \criu, \texttt{DMTC}~\cite{dmtcp}, and \texttt{BLCR}~\cite{blcr}.
+They both focus on high performance, what motivates some of their design choices.
 
-Compare:
+\textbf{DMTCP.}
 
-- VM C/R
+Distributed Multi-Threaded Checkpointing (DMTCP) is an active project lead by Prof. Cooperman at Northeastern University that implements C/R on a library level.
+This means that if a user wants to checkpoint it's application, this must be dynamically linked from the very beginning and executed with custom wrappers (which decreases transparency).
+DMTCP intercepts all system calls instead of assuming existing kernel interfaces, as \criu does, and is, as a consequence, more robust and reliable.
+It is very popular in HPC environments and is present in a variety of publications~\cite{Ansel2009,Garg2019}.
 
-- CRIU
+\textbf{BLCR}
 
-- DMTCP
+Berkeley Lab Checkpoint/Restart (BLCR) is a system-level checkpointing tool aimed also at High Performance Computing jobs.
+It requires loading an additional kernel module and is currently not maintained (last supported kernel version is $3.7$).
 
-- BLCR
-
-- FTI: maybe this falls a bit out of the scope \url{https://github.com/leobago/fti}
-
-We could also include snippets of how to run a Hello World for each alternative.
-
+A detailed table comparing the software here presented, and some other solutions, is maintained by the CRIU foundation~\cite{criu-comparison}.
