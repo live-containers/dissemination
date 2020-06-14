@@ -1,34 +1,21 @@
-\chapter{Evaluation (probably rename as well)} \label{chap:evaluation}
+\chapter{Evaluation} \label{chap:evaluation}
 
-The key difference between the results here presented and the ones in the previous section would be that in the previous chapter we would only run micro-benchmarks to validate that our implementation is sound.
+In the previous chapter, \S\ref{chap:system}, we have presented our implementation of live migration of containers using \criu and \runc, and have motivated our design choices with micro-benchmarks that fulfil the initial objectives specified in the introduction.
 
-In this chapter however my aim would be to both run some macro-benchmarks in the sense that we evaluate for instance: iterative + remote + diskless migration, or an assesment of a real-application using TCP connections (e.g. our database or a VPN server) and measure interesting things.
+In this chapter, we move on to evaluate the system as a whole, and how the different features interlace and work together, and  how does our system compare to traditional virtual machine live migration.
 
 \section{Macro-Benchmarks}
-
-Run some macrobenchmarks we can think of namely:
 
 \subsection{Iterative, Remote, Diskless Migration}
 
 Goal here would be to have the diagram we went over once, in which we plot over time the amount of memory we send.
 
-\subsection{Checkpointing TCP Connections}
+\cs{Re-do the initial plot presented}
 
-Maybe measure throughput and downtime
+\subsection{Checkpointing TCP Connections inside Network Namespaces}
 
-\subsection{More Large-scope Experiments we can think of}
+\cs{Include the content from Decentralized Systems}
 
-\section{Performance of \projName}
+\section{Comparison with Virtual Machines Migration}
 
-In this section I would aim to measure the performance of our distributed checkpointing in the form it ends up happening and from a number of different perspectives.
-
-\cs{Here it is very important to try and find some systems we could compare against with.}
-Some that come of the top of my mind are:
-\begin{itemize}
-    \item Raw CRIU: given that we also have PoCs for the different features using only CRIU, maybe we could compare using that.
-    \item VM system: I am unaware if there is a way to checkpoint a network of VMs and then restart them.
-    
-    \jg{At least you should be able to compare with a VM system for the migration of a single VM}.
-\end{itemize}
-
-\subsection{Comparison Against WHAT?}
+\cs{Recreate the plot in ~\cite{Clark2005}}
