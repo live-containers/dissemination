@@ -83,7 +83,7 @@ cp /path/to/src/images/* \
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Commands to perfrom a checkpoint in \criu using a page server.\label{code:microbenchmark-diskless-criu}}]
+\begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \criu using a page server.\label{code:microbenchmark-diskless-criu}}]
 #!/bin/bash
 # Start the Page Server
 sudo criu page-server \
@@ -107,7 +107,7 @@ cp /path/to/src/images/* \
 \end{figure}
 
 % Experiment
-In order to benchmark the performance of diskless migration when compared to disk-based one and the beneffits of using a page server, we set up two different experiments.
+In order to benchmark the performance of diskless migration when compared to disk-based one and the benefits of using a page server, we set up two different experiments.
 In one hand we have a counter program written in C (see Listing~\ref{code:c-counter} for the full implementation) that increments a value and prints it to \texttt{stdout}.
 On the other hand we have an instance of a \redis in-memory database that we pre-load with $1e7$ keys.
 The total weight of the memory image dump is $912$ MB.
@@ -163,7 +163,7 @@ During the second step, at memory dump time, if this bit has not been set, the m
 To enable this functionality in \criu, we must use the \texttt{--track-mem} flag.
 
 One last key step required to achieve efficiency and correctness upon restore is to link the actual dump (or pre-dump) with the one preceding it, it's \emph{parent}.
-For a pre-dump, \texttt{--prev-images-dir} indicates \criu to look for exsiting dumps in the specified path, and perform the bit-checking described in the previous paragraphs.
+For a pre-dump, \texttt{--prev-images-dir} indicates \criu to look for existing dumps in the specified path, and perform the bit-checking described in the previous paragraphs.
 Upon restore, links among successive dumps are pieced together to successfully restore the freshest version of the running program.
 
 The integration with \runc is seamless.
@@ -173,7 +173,7 @@ In Listings \ref{code:microbenchmark-iterative-criu} and \ref{code:microbenchmar
 The complete scripts used for the benchmarking are included in Listing \ref{code:microbenchmark-iterative-evaluation}.
 \begin{figure}[h!]
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running process using CRIU.\label{code:microbenchmark-iterative-runc}}]
+\begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running process using CRIU.\label{code:microbenchmark-iterative-runc}}]
 #!/bin/bash
 # First Pre-Dump
 sudo runc checkpoint \
@@ -202,7 +202,7 @@ sudo runc checkpoint \
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Scripts to perfrom two pre-dumps and a dump of a running container using runC.\label{code:microbenchmark-iterative-criu}}]
+\begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running container using runC.\label{code:microbenchmark-iterative-criu}}]
 #!/bin/bash
 # First Pre-Dump
 sudo criu pre-dump \
@@ -232,6 +232,8 @@ sudo criu dump \
 \end{minipage}
 \end{figure}
 
+\jg{Mention somewhere that a threshold defines for how long the migration iterates on copying dirty memory before deciding to stop the container and do the final copy. This is probably a parameter that one can play with to tune the migration process (although we don't evaluate this in our experiments).}
+
 In order to perform a micro-benchmark of this functionality we consider two different scenarios: a simple counter written in \texttt{C}, and a \redis in-memory database, as introduced in the previous section.
 For each scenario we perform two pre-dumps, and a final dump, and report the size of the \texttt{pages-1.img} file (which contains the memory dump).
 We test a static setting in which we don't change the memory during successive dumps which acts as a baseline, and a dynamic one in which, between each dump, we modify the contents of the process memory.
@@ -250,7 +252,7 @@ First of all, note how we use different scales for the counter application (left
 We observe that, as expected, if we make no changes to the process' memory after the first dump, the amount of information to be re-transferred is very little, which we attribute it to \criu's metadata.
 In the counter case, the initial dump is around 90 kB and subsequent ones are 12 kB, whereas in the \redis one, the size decreases from 900 MB to just 1 MB.
 Once we modify the memory, additional pages need to be transferred.
-In the counter case, between successive dumps we just increase the value of a variable and alter the state of \texttt{stdout}, what translates in a 10 kB inrease in the image size every time.
+In the counter case, between successive dumps we just increase the value of a variable and alter the state of \texttt{stdout}, what translates in a 10 kB increase in the image size every time.
 In the \redis one, the \texttt{redis-benchmark} is non-deterministic in nature, but it's worth observing how shuffling a percent of the total key-store propagates to higher percentages of memory re-use.
 We conclude that memory tracking is a necessary feature if any application considers even near-live migration of production applications, and the technology presented allows for an easy way to do-so.
 
@@ -259,16 +261,18 @@ We conclude that memory tracking is a necessary feature if any application consi
 
 Maybe not an aside, but putting it here to remember
 
-\cs{Mention that before we were optimizing a-priori, wheras this technique is a-posteriori.}
+\cs{Mention that before we were optimizing a-priori, whereas this technique is a-posteriori.}
 
 \subsection{Remote Migration}
+
+\jg{I assume you will place here some experiments demonstrating the migration between different nodes?}
 
 \subsection{Checkpointing TCP Connections}
 
 The ability to checkpoint established TCP connection is mainly due to the inclusion of the \texttt{TCP\_REPAIR} socket option to kernel version $3.5$~\cite{tcp-connection-repair}.
 
 Similarly to other resources and as introduced in \S\ref{chap:background}, basic information about sockets is obtained by parsing the adequate files in the \texttt{/proc} filesystem.
-However, there are some internals of active network connections (namely negotiatied parameters such as send and receive queues, and sequence numbers) that require putting the socket in the \texttt{TCP\_REPAIR} state using the \texttt{setocketopt()} syscall (note that this action requires \texttt{CAP\_NET\_ADMIN} capabilities).
+However, there are some internals of active network connections (namely negotiated parameters such as send and receive queues, and sequence numbers) that require putting the socket in the \texttt{TCP\_REPAIR} state using the \texttt{setocketopt()} syscall (note that this action requires \texttt{CAP\_NET\_ADMIN} capabilities).
 Then, if the connection is closed whilst the socket is in \texttt{TCP\_REPAIR} mode, no \texttt{FIN} nor \texttt{RST} packets are sent to the other peer, what means that his endpoint is effectively still open~\cite{Corbet12}.
 
 To re-establish the connection from the newly generated socket, the first thing to do is put it, again, in \texttt{TCP\_REPAIR} mode.
@@ -356,7 +360,7 @@ Integration with \runc is two-fold.
 For the TCP connection \criu's binding for \runc includes a \texttt{--tcp-established} flag that does most of the socket management.
 If we are interested in restoring the connection in a different machine or namespace, we must manually recreate the filter table from Table~\ref{table:iptables-rules} using the \texttt{iptables} command.
 Lastly, to restore into an existing namespace, the container must be restored with the adequate open file descriptors using \criu's \texttt{--external}~\cite{criu-external} and \texttt{--inherit-fd}~\cite{criu-inherit-fd}.
-In Listings~\ref{code:microbenchmark-tcp-nonetns} and~\ref{code:microbenchmark-tcp-netns} we include excerpts of snippets to checkpoint and restore a established TCP connection without or within a network namespace respectively.
+In Listings~\ref{code:microbenchmark-tcp-nonetns} and~\ref{code:microbenchmark-tcp-netns} we include excerpts of snippets to checkpoint and restore an established TCP connection without or within a network namespace respectively.
 The complete scripts for the evaluation are included in Listings~\ref{code:microbenchmark-tcp-criu-downtime} and~\ref{code:microbenchmark-tcp-criu-reactivity} for \criu's downtime and reactivity experiments, and in Listings~\ref{code:microbenchmark-tcp-runc-downtime} and~\ref{code:microbenchmark-tcp-runc-reactivity} for \runc's.
 \begin{figure}[h!]
 \begin{minipage}{.45\textwidth}
@@ -459,6 +463,7 @@ This reduced value, together with the fact that the application studied is very 
 Lastly, in both Figures we observe that, albeit being the experiments running bare processes with \criu slightly faster to restore, the overhead introduced by \runc is negligible.
 
 To be done.
+\jg{The previous sentence must be probably a comment}
 A necessary first step is to manage the namespaces and IPs as we do now.
 
 \section{Putting it All Together}

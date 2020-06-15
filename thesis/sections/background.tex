@@ -6,7 +6,7 @@ This chapter provides a detailed introduction to these concepts as they are nece
 
 \section{Containers} \label{sec:containers}
 
-A linux container is a set of isolated processes with a limited view of their environment.
+A Linux container is a set of isolated processes with a limited view of their environment.
 They build on traditional concepts of virtualization, and provide an alternative to virtual machines (VM).
 A container is usually faster, lighter, and more flexible than a VM.
 As a consequence they are becoming the technology of choice in multi-tenant settings, such as data centers.
@@ -30,14 +30,14 @@ The former adds an hypervisor or virtual machine monitor (VMM) which creates the
 The latter modifies the guest OS' source code and replaces sensitive calls with \emph{hypercalls}, which are direct calls to the hypervisor.
 
 \textbf{OS-level Virtualization.}
-Operating Sytem-level virtualization allows for multiple isolated user-space instances, called \textbf{containers} which share a single operating system.
+Operating System-level virtualization allows for multiple isolated user-space instances, called \textbf{containers} which share a single operating system.
 In comparison to traditional virtual machines, containers add little overhead, require minimal startup, and have a low resource requirement, all this factors make them highly scalable.
 Containers have experienced an exponential increase in usage, specially with the advent of open-source highly-available container engines such as \textsc{Docker} (\url{https://www.docker.com/}), Linux Containers \textsc{LXC} (\url{https://linuxcontainers.org/}), \textsc{Podman} (\url{https://podman.io/}, among others.
 Given that the goal of this project is to perform efficient live migration of running containers, the following section provides further technical details on containerization.
 
 \subsection{Working Principles of Containers}
 
-As previously introduced, a linux container is a set of processes that are isolated from the rest of the machine.
+As previously introduced, a Linux container is a set of processes that are isolated from the rest of the machine.
 To achieve this isolation, they rely on two kernel features: control groups and namespaces~\cite{namespaces-manual}.
 
 \subsubsection*{Namespaces}
@@ -146,6 +146,7 @@ However, engines don't tend to actually instantiate the containers themselves, a
 The runtime is the lower level component that interacts with the kernel, it's specification~\cite{container-runtime-specification} is also maintained and developed by the OCI.
 \runc is it's reference implementation, and our tool of choice to implement live migration.
 We have chosen to skip the engine layer and interact with the runtime as support for advanced \criu features is lacking in higher-level tools.
+\jg{You might refer here to later section on CRIU.}
 
 \subsubsection*{Different Container Engines and Runtimes}
 
@@ -209,14 +210,16 @@ However, these solutions are \textit{ad-hoc}, error-prone, and most importantly 
 
 \subsection{Checkpoint/Restore}
 
-Checkpointing refers to the ability of storing the state of a computation such that it can be continued later at that same state without covering the preceeding ones.
+Checkpointing refers to the ability of storing the state of a computation such that it can be continued later at that same state without covering the preceding ones.
 The saved state is called a \textit{checkpoint} and the resumed process a \textit{restart} or \textit{restore}~\cite{Schulz2011}.
-It provides systems with additional fault-tolerancy and fast rollback times.
+It provides systems with additional fault-tolerance and fast rollback times.
 C/R tools snapshot an application's state regardless of the software running and without requiring, in general, any additional work from the application developer.
 Even though they originated in the High Performance Computing environment, these tools are also useful for debugging, skipping long initialization times, and, as in this work, live process migration.
 
 During checkpoint, and in order to save the process' state, all the essential information such as the program's memory, file descriptors, sockets and pipes, among others are dumped.
 In the distributed scenario, additional logic is required to coordinate the checkpoint across all processes~\cite{Raynal2013}.
+
+\jg{I think that there were checkpointing solutions before the appearance of virtual machines: https://en.wikipedia.org/wiki/Application_checkpointing#cite_note-1}
 
 The first implementations for C/R appeared in the setting of virtual machines~\cite{Clark2005}.
 VM checkpointing is easier when compared to arbitrary process checkpointing as VMs are already isolated.
@@ -236,7 +239,7 @@ Other more refined and more popular mechanisms minimize this downtime, we highli
 \textbf{Pre-Copy Migration.}
 
 Pre-copy migration, or sometimes called iterative migration, is a live migration technique that transfers most of the checkpoint information previously to stopping the running process, and only stops it once the information to transfer to the other end is minimal, achieving a very low downtime~\cite{Bradford2007}.
-As memory pages tend to be the largest resource to dump and transfer, most pre-copy implementations iteratively transfer the memory that has changed between subsequent iterations.
+As memory pages tend to be the largest resource to dump and transfer, most pre-copy implementations iteratively transfer the memory that has changed between subsequent iterations. \jg{Well, this is true assuming that the storage is shared among the nodes, so you do not need to transfer the file system.}
 When the information to transfer is lower than a specified threshold, the application is stopped in one end, the remaining bits sent over the wire, and resumed in the other one.
 
 \textbf{Post-Copy Migration.}
@@ -244,7 +247,7 @@ When the information to transfer is lower than a specified threshold, the applic
 Post-copy migration follows a radically different approach.
 Initially, it transfers the minimal information for the process to be able to resume on the destination host~\cite{Shirbam2012}.
 Then, page faults in the new host are resolved over the network, sending a request for a page that was not sent in the initial batch.
-This approach tends to be faster (lower total migration time) than pre-copy, but inccurs in service degradation as page faults become extremely costly.
+This approach tends to be faster (lower total migration time) than pre-copy, but incurs in service degradation as page faults become extremely costly.
 In the literature post-copy migration is also referred to as \textbf{lazy migration}.
 
 \subsection{Distributed Checkpointing}
@@ -255,6 +258,7 @@ Reaching consensus among a set of distributed processes is a well-studied topic 
 Since then, more and more algorithms have been presented~\cite{Raynal2013,Kshemkalyani2008} optimizing certain aspects of the process.
 However, transparent distributed C/R is yet to be implemented in a software tool.
 The work here presented aims to be a step in this direction.
+\jg{I assume this is because of the support for established TCP connections, not because of the implementation of a distributed coordination algorithm.}
 
 \section{\criu: Checkpoint Restore in Userspace} \label{sec:bg-criu}
 
@@ -285,8 +289,8 @@ It's purpose is to execute \criu calls from within the dumpee's task address spa
 To achieve this goal, \criu must:
 \begin{enumerate}
     \item Move task into seized state calling \texttt{ptrace(PTRACE\_SEIZE, ...)}. Note that the task is stopped without it noticing, hence not altering it's state.
-    \item Inject an \texttt{mmap} syscall in the current stack's instruction pointer, and allocate memory for the whole code blob. At this stage, space for exchanging parameters and results is also allocated within the dumpee's process adress space. \criu is now ready to run parasite service routines.
-    \item The external dumping process retrieves information about the dumpee's adrress space through the parasite code either through \emph{trap} mode (one command at a time) or \texttt{daemon} mode (in which the parasite behavies as a UNIX socket.
+    \item Inject an \texttt{mmap} syscall in the current stack's instruction pointer, and allocate memory for the whole code blob. At this stage, space for exchanging parameters and results is also allocated within the dumpee's process address space. \criu is now ready to run parasite service routines.
+    \item The external dumping process retrieves information about the dumpee's address space through the parasite code either through \emph{trap} mode (one command at a time) or \texttt{daemon} mode (in which the parasite behaves as a UNIX socket.
     \item With information about used memory areas and important flags read from \texttt{/proc/\$pid/smaps/} and \texttt{/proc/\$pid/pagemap}, the parasite code transfers the actual content outside through a set of pipes, which in turn gets translated into image files.
 \end{enumerate}
 Lastly, the target process is cured from the parasite by closing it, unmapping it's allocated memory area, and reverting to the original frozen state.
@@ -301,7 +305,7 @@ Starting with kernel 5.3 and the new \texttt{clone3()} system call, it becomes n
 
 Then \criu restores all basic task resources such as file descriptors, namespaces, maps, ...
 The only resources that are \emph{not} restored at this stage are, most notably, memory mappings.
-In order to restore memory areas, and since the morphing is done \textit{in-place}, before exitting \criu would have to unmap itself and map the application code.
+In order to restore memory areas, and since the morphing is done \textit{in-place}, before exiting \criu would have to unmap itself and map the application code.
 To overcome this issue, a similar approach to the parasite code one is followed, the \textbf{restorer blob}.
 The restorer blob is a piece of PIE code, to which \criu transfers control to unmap itself and map the appropriate code and memory areas for the process to restore successfully.
 
