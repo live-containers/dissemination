@@ -1,24 +1,20 @@
 \chapter{\projName (think of a name for the system)} \label{chap:system}
 
-In this chapter I would present the majority of the work we have done.
-From a design perspective, implementation, and evaluation.
+In this chapter we present our implementation of live migration of \runc containers using \criu.
+In order to achieve efficiency, liveness, and mimick a realistic setting, we explore disk-less and iterative migrations, and checkpointing established TCP connections and external namespaces.
+First, in \S\ref{sec:arch-blocks}, we cover the implementation of each of these features in \criu and their integration with \runc.
+Then, we perform a set of microbenchmarks to assess their impact on performance, and finish with a snippet showcasing their usage.
+Lastly, in \S\ref{sec:system}, we provide insights on our final open source implementation available at \url{https://github.com/live-containers/live-migration}.
 
-\section{Building Blocks}
+\section{Building Blocks} \label{sec:arch-blocks}
 
-For each one, present:
-\begin{itemize}
-    \item A bit of the theory behind it
-    \item A basic proof of concept (maybe even bash scripts)
-    \item Integration with \texttt{runc} and our system (yet to be named)
-    \item A micro-benchmark of this feature.
-\end{itemize}
+In this first section we study the implementation of diskless and iterative migration in \criu.
+The former allows fast checkpoint/restore without writing to disk.
+The latter allows for incremental dumps, which in turn reduces downtime when migrating an application as the load can be divided among subsequent dumps.
+We also introduce how to checkpoint and migrate established TCP connections and established namespaces.
 
-This first section introduces the key building blocks of that make up \projName.
-For each one of them we cover the theoretical concepts, the problem they try to solve, their implementation (and integration with \criu and \runc if existent), together with a targeted benchmark.
-
-\cs{Describe the evaluation setting, versions etc.}
-
-\cs{Link to the github repo with the benchmarking}
+For each different feature, we prepare a set of experiments.
+Unless otherwise stated, we run each one in a Debian machine with kernel version \texttt{4.19.0-6} and use \criu version 3.13 and \runc version \texttt{1.0.0-rc8}, both built from source.
 
 \subsection{Diskless Migration}
 
@@ -263,9 +259,9 @@ Maybe not an aside, but putting it here to remember
 
 \cs{Mention that before we were optimizing a-priori, whereas this technique is a-posteriori.}
 
-\subsection{Remote Migration}
-
-\jg{I assume you will place here some experiments demonstrating the migration between different nodes?}
+%\subsection{Remote Migration}
+% CS: I forgot to comment this. I initially included it but then figured out it did not add any value since the main difference would be raw bandwidth.
+%\jg{I assume you will place here some experiments demonstrating the migration between different nodes?}
 
 \subsection{Checkpointing TCP Connections}
 
@@ -466,7 +462,7 @@ To be done.
 \jg{The previous sentence must be probably a comment}
 A necessary first step is to manage the namespaces and IPs as we do now.
 
-\section{Putting it All Together}
+\section{Putting it All Together} \label{sec:system}
 
 \cs{Cover the current implementation}
 

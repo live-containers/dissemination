@@ -5,10 +5,19 @@
 
 Introduction/motivation
 
+This Master thesis is an initial approach to live migration of distributed container deployments.
+We first study the different tools to checkpoint and restore containers and their integration with different container engines.
+Then, we provide a proof of concept implementation of live migration of running and connected containers transparently to the end user.
+In particular we make use of \criu (Checkpoint-Restore in Userspace) 
+
 The main goal of this work is to implement efficient live migration of running containers.
 The terms \textit{efficient} and \textit{live} are vague in the absence of concise metrics, and the variety of running containers is also huge, as a consequence we specify a set of objectives we want our system to fulfill.
 \begin{itemize}
-    \item Minimize downtime and resource utilization of memory-intensive applications.
+    \item Minimize downtime and resource utilization of live migrations of memory-intensive applications.
+\end{itemize}
+
+In order to support the previously mentioned objectives, we set up a series of specifications our implementation must fulfil.
+\begin{itemize}
     \item Support for established TCP connections
     \item Support for C/R of namespaces
 \end{itemize}
