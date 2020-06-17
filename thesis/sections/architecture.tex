@@ -458,13 +458,45 @@ This reduced value, together with the fact that the application studied is very 
 
 Lastly, in both Figures we observe that, albeit being the experiments running bare processes with \criu slightly faster to restore, the overhead introduced by \runc is negligible.
 
-To be done.
-\jg{The previous sentence must be probably a comment}
-A necessary first step is to manage the namespaces and IPs as we do now.
-
 \section{Putting it All Together} \label{sec:system}
 
-\cs{Cover the current implementation}
+In this section we cover our implementation of live migration of running \runc containers using \criu.
+As previously mentioned, the complete source code is available on Github: \url{https://github.com/live-containers/live-migration}.
+The implementation is fully in \texttt{C} and it amounts to around 1300 LoC.
+We chose \texttt{C} to have a cleaner interaction with the underlying system and a smoother integration with \criu, which is also written in \texttt{C}.
+However, \criu exposes all it's services via an RPC client, hence it should be compatible with a variety of other programming languages.
+Additionally, all the namespace and ip tables handling can be done natively importing the adequate libraries.
+Lastly, \runc is written in \texttt{Go} and we had to interact with it spawning a shell from the main process.
+We would like to eventually try \texttt{crun}, an OCI-compliant runtime written in \texttt{C}, and see whether performance could be improved.
+We leave this for future work.
 
-\cs{Include some code snippets/design choices}
+\subsection{High Level Specification}
 
+We have implemented a tool that, given a container name and a remote server, migrates execution from the host where the command is run, to the one specified in the argument list.
+In particular, it checkpoints the container, transfers the image files over the network, and restores remotely the execution.
+As optional parameters, the user might specify whether they prefer diskless or file-based migration (defaults to diskless), iterative or one shot (defaults to iterative), and the path where intermediate files will be stored.
+
+We make two important assumptions in the current implementation.
+First, we assume that the user running the migration has access to the machine specified in the argument list.
+In particular we assume SSH access.
+We have chosen to rely on a single execution process, rather than having a client-server architecture like other solutions do~\cite{criu-phaul}.
+Hence why we don't need a server process running in the remote machine, but require execution privileges there.
+Second, we assume the required container bundle (\texttt{rootfs} directory and \texttt{config.json} specification file) to be available in the remote end.
+These are required to restore the container.
+Note that this assumption could be easily circunvented pre-generating the bundle before executing the migration.
+The procedure to create a \texttt{rootfs} bundle is very straightforward and we include an example in Snippet~\ref{code:runc-bundle}.
+\begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} filesystem.\label{code:runc-bundle}}]
+#!/bin/bash
+# Mount a tmpfs filesystem rooted in the /tmp/my-tmpfs directory with maximum size 100 MB
+mkdir /tmp/my-tmpfs
+sudo mount -t tmpfs -o size=100M tmpfs /tmp/my-tmpfs
+
+# Check the new file system appears in the list of mounted devices
+sudo mount | grep /tmp/my-tmpfs
+
+# Unmount the filesystem 
+sudo umount /tmp/my-tmpfs # CAUTION: THIS WILL DESTROY THE CONTENTS
+\end{lstlisting}
+
+We have implemented two additional modules.
+One performs all the interactions with the remote host such as transfering files, creating directories, and running \criu commands.
