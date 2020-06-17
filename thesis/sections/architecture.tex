@@ -49,7 +49,7 @@ The page server is a component of \criu that allows to send memory dumps directl
 Note that the page server is used only to migrate memory files, which tend to be the largest ones, whereas other image files still need to be transferred when migrating.
 The current implementation uses only TCP sockets and no encryption nor compression is used on the network transfer.
 It is also worth mentioning that \texttt{criu page-server --port} is a one-shot command, \textit{i.e.} if we perform multiple dumps, a page server must be started for each one of them.
-Observe that, even though it introduces a small overhead, our results (see Figure~\ref{fig:diskless-migration-microbenchmark}) show that for migrations within the same machine, setting up a page server in $\texttt{localhost}$ outperforms the double-copying approach for larger applications.
+Observe that, even though it introduces a small overhead, our results (see Figure~\ref{fig:diskless-migration-microbenchmark}) show that for migrations within the same machine, setting up a page server in \texttt{localhost} outperforms the double-copying approach for larger applications.
 
 % Integration w/ runC
 As introduced in the previous paragraphs, the key pieces to achieve efficient diskless migrations are making use of a \texttt{tmpfs} file system and \criu's page server.
@@ -152,7 +152,7 @@ This allows for a baseline from which smaller \emph{incremental} dumps are perfo
 Note that, at this point, we are not interested in capturing the whole state, hence the usage of the \texttt{pre-dump} command in CRIU.
 
 Memory tracking in CRIU~\cite{criu-memory-tracking} is done by means of a kernel functionality introduced in 2013~\cite{criu-memory-tracking-lwn}.
-It consists of two steps: first we ask the kernel to keep track of memory changes on a per-process basis by writing a $4$ to \texttt{/proc/\$pid/clear\_refs} and, after a while, reading the \texttt{/proc/\$pid/pagemap} file and checking the \textit{soft-dirty} bit for each page table entry (PTE).
+It consists of two steps: first we ask the kernel to keep track of memory changes on a per-process basis by writing a $4$ to \texttt{/proc/pid/clear\_refs} and, after a while, reading the \texttt{/proc/pid/pagemap} file and checking the \textit{soft-dirty} bit for each page table entry (PTE).
 Internally, in the first step the kernel clears all soft-dirty bits \emph{and} the writable ones per each PTE for the given process id (PID).
 Subsequent writes to any page will trigger a page fault, a call to \texttt{pte\_mkdirty}, and therefore the \textit{soft-dirty} bit will be set.
 During the second step, at memory dump time, if this bit has not been set, the memory page needs not to be transferred again.
@@ -265,6 +265,8 @@ Maybe not an aside, but putting it here to remember
 
 \subsection{Checkpointing TCP Connections}
 
+\cs{Include snippets for the echo server in the appendix.}
+
 The ability to checkpoint established TCP connection is mainly due to the inclusion of the \texttt{TCP\_REPAIR} socket option to kernel version $3.5$~\cite{tcp-connection-repair}.
 
 Similarly to other resources and as introduced in \S\ref{chap:background}, basic information about sockets is obtained by parsing the adequate files in the \texttt{/proc} filesystem.
@@ -365,25 +367,25 @@ The complete scripts for the evaluation are included in Listings~\ref{code:micro
 # CRIU Dump and Restore, one after the other 
 # but in the BG (not affecting time)
 (sudo criu dump \
-    -t ${SERVER_PID} \
-    --images-dir ${IMAGES_DIR} \
+    -t `SERVER_PID` \
+    --images-dir `IMAGES_DIR` \
     --tcp-established; \
 echo "Restoring server..."; \
 sudo criu restore \
-    --images-dir ${IMAGES_DIR} \
+    --images-dir `IMAGES_DIR` \
     --tcp-established) &
 
 # Similarly with runC
 (sudo runc checkpoint \
-    --image-path ${IMAGES_DIR} \
+    --image-path `IMAGES_DIR` \
     --tcp-established \
     eureka; \
 cd /container/directory; \
 sudo runc restore \
-    --image-path ${IMAGES_DIR} \
+    --image-path `IMAGES_DIR` \
     --tcp-established \
     eureka; \
-cd ${CWD}) &
+cd `CWD`) &
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
@@ -484,19 +486,181 @@ Hence why we don't need a server process running in the remote machine, but requ
 Second, we assume the required container bundle (\texttt{rootfs} directory and \texttt{config.json} specification file) to be available in the remote end.
 These are required to restore the container.
 Note that this assumption could be easily circunvented pre-generating the bundle before executing the migration.
-The procedure to create a \texttt{rootfs} bundle is very straightforward and we include an example in Snippet~\ref{code:runc-bundle}.
-\begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} filesystem.\label{code:runc-bundle}}]
+The procedure to create a \texttt{rootfs} bundle is very straightforward and we include an example in Listing~\ref{code:runc-bundle}.
+\begin{lstlisting}[style=Bash,caption={Commands to generate an OCI bundle to run a container using \runc.\label{code:runc-bundle}}]
 #!/bin/bash
-# Mount a tmpfs filesystem rooted in the /tmp/my-tmpfs directory with maximum size 100 MB
-mkdir /tmp/my-tmpfs
-sudo mount -t tmpfs -o size=100M tmpfs /tmp/my-tmpfs
+// Create a new directory for the container
+mdkir ./my-container && cd my-container
 
-# Check the new file system appears in the list of mounted devices
-sudo mount | grep /tmp/my-tmpfs
+// Create a root filesystem
+mkdir rootfs
 
-# Unmount the filesystem 
-sudo umount /tmp/my-tmpfs # CAUTION: THIS WILL DESTROY THE CONTENTS
+// Export the docker image into the root filesystem
+docker export `docker create <image-tag>` | tar -C rootfs -xvf -
+
+// Generate the config file using the OCI runtime tool
+oci-runtime-tool generate <args>
 \end{lstlisting}
+Lastly, it is worth mentioning that the support for rootless containers is still work-in-progress in the \criu project~\cite{criu-user-mode}.
+Therefore, to run the software the user must have \texttt{root} permissions both in both machines (in particular \texttt{CAP\_SYS\_ADMIN}).
 
-We have implemented two additional modules.
+We have also implemented two additional modules.
 One performs all the interactions with the remote host such as transfering files, creating directories, and running \criu commands.
+In particular, we use \texttt{libssh}~\cite{libssh} to interact with the other node, and implement our methods basing on their low-level primitives.
+The second is a benchmarking module that through conditional compilation adds profiling instructions and generates reports to populate the plots we present throughout this document.
+
+\subsection{Implementation Details}
+
+\textbf{Migration Module}
+
+The first step consists in processing the user input.
+We require the container name, which must be a running container (\textit{i.e.} must have a matching entry in \texttt{sudo runc list}) and an IP address (more on that on the networking module).
+We also allow for a series of optional parameters.
+Firstly, the user might choose to perform a one-shot migration, rather than an iterative one, and the path to store intermediate results can also be determined at this stage.
+Second, the user can opt to not use diskless migration and persist intermediate files.
+In the event of a diskless migration, the parameters (address and port) where the page server runs also can be determined.
+Lastly, the user can also specify a directory where to mount the \texttt{tmpfs} filesystem.
+Otherwise the system will default to, if available, \texttt{/dev/shm}.
+For the remaining of the walkthrough we will assume the default parameters are set: diskless, iterative migration, with a page server running in the remote end and relying on \texttt{/dev/shm} as our \texttt{tmpfs} filesystem of choice.
+
+The most important part in the migration procedure is a loop that periodically and whilst the amount of memory to transfer exceeds a threshold does the following:
+\begin{enumerate}
+    \item \textbf{Create Directories.} The first step is to create the local and remote directories where image files will be stored. This has to be done before anything else as otherwise the page server will report an error and crash.
+    \item \textbf{Start Page Server.} As previously introduced, \criu's page server is a one-shot command. This means that once it serves a request it terminates. As a cosnequence at the start of every iteration the command must be re-run. We start it with the following snippet: \texttt{sudo criu page-server -d --images-dir <path> --prev-images-dir <prev-path>} \\\texttt{--port <port>}. Note that the \texttt{prev-images-dir} is crucial to avoid memory duplication.
+    \item \textbf{Checkpoint.} Now we are ready to checkpoint the container. We use the following command: \texttt{sudo runc checkpoint --pre-dump --image-path <path> --page-server <host>:<port>} \\\texttt{<container\_name>}. Note that the \texttt{--pre-dump} flag is crucial to keep the container running and only dump the contents of the memory, which will be automatically over the network to the page server (and not written to disk).
+    \item \textbf{Transfer Remaining Files.} Even though we are only running a \texttt{pre-dump}, there are a few files that need to be transferred to the other node, and we do so at this stage. We additionally perform housekeeping duties cleaning temporary files.
+    \item \textbf{Update Directory Counter.} The last step, and not to be overlooked, consists in updating the directory chain that links iterative dumps. In point 2, we need to specify the path to the preceding directory, as a consequence we keep a linked list of directory names.
+\end{enumerate}
+We include a simplified version of this loop in Listing~\ref{code:iterative-loop}.
+Most of the technical details have been omitted for simplicity, and should be directly inspected in GitHub.
+\begin{lstlisting}[language=C,caption={Iterative migration internal loop.\label{code:iterative-loop}}]
+while (size_to_xfer > MEMORY_THRESHOLD)
+{
+    /* Prepare Migration: create directories and start page server */
+    if (prepare_migration(args, i == 0) != 0)
+    {
+        fprintf(stderr, "iterative_migration: prepare migration failed at \
+                         iteration %i.\n", i + 1);
+        return 1;
+    }
+    memset(cmd_dump, '\0', MAX_CMD_SIZE);
+    if (i == 0)
+        sprintf(cmd_dump, "sudo runc checkpoint --pre-dump --image-path %s \
+                --page-server %s:%s %s", args->src_image_path, 
+                args->dst_host, args->page_server_port, args->name);
+    else
+        sprintf(cmd_dump, fmt_cmd_dump, args->src_image_path,
+                args->src_prev_image_dir, args->dst_host,
+                args->page_server_port, args->name);
+
+    /* Run Pre-Dump */
+    if (system(cmd_dump) != 0)
+    {
+        fprintf(stderr, "iterative_migration: pre-dump #%i failed.\n", i);
+        return 1;
+    }
+
+    /* Transfer the Remaining Files */
+    if (sftp_copy_dir(args->session, args->dst_image_path, 
+                      args->src_image_path, 0, &dir_size) != SSH_OK)
+    {
+        fprintf(stderr, "migration: error transferring from '%s' to '%s'\n",
+                args->src_image_path, args->dst_image_path);
+    }
+
+    /* Swap Dirs */
+    if (increment_dirs(i) != 0)
+    {
+        fprintf(stderr, "migration: error incrementing dirs\n");
+        return 1;
+    }
+    i++;
+}
+\end{lstlisting}
+Once we exit the loop, it means the remaining files to transfer are sufficiently small.
+We then proceed to checkpoint and stop the container, transfer the remaining files, and restore it in the other node.
+We persent a simplified version of the code in Listing~\ref{code:last-cp}.
+\begin{lstlisting}[language=C,caption={Snippet for the last (stopping) checkpoint and remote restore.\label{code:last-cp}}]
+/* Prepare Environment: create directories and start page server */
+if (prepare_migration(args, 0) != 0)
+{
+    fprintf(stderr, "migration: prepare_migration failed.\n");
+    return 1;
+}
+
+/* Craft Checkpoint and Restore Commands */
+char *fmt_cp = "sudo runc checkpoint "
+               "--parent-path %s "
+               "--image-path %s "
+               "--tcp-established "
+               "--page-server %s:%s %s";
+char *fmt_rs = "cd %s && echo %s | sudo -S runc restore --image-path %s \
+                %s-restored &> /dev/null < /dev/null &";
+sprintf(cmd_cp, fmt_cp, last_dir, args->src_image_path, args->dst_host,
+        args->page_server_port, args->name);
+sprintf(cmd_rs, fmt_rs, RUNC_REDIS_PATH, REMOTE_PWRD, args->dst_image_path, args->name);
+
+/* Checkpoint the Running Container */
+if (system(cmd_cp) != 0)
+{
+    fprintf(stderr, "migration: error checkpointing w/ command: '%s'\n",
+            cmd_cp);
+    return 1;
+}
+
+/* Copy the Remaining Files (should be few as we are running diskless) */
+if (sftp_copy_dir(args->session, args->dst_image_path, 
+                  args->src_image_path, 0, &dir_size) != SSH_OK)
+{
+    fprintf(stderr, "migration: error transferring from '%s' to '%s'\n",
+            args->src_image_path, args->dst_image_path);
+    return 1;
+}
+
+/* Restore the Running Container */
+if (ssh_remote_command(args->session, cmd_rs, 0) != SSH_OK)
+{
+    fprintf(stderr, "migration: error restoring w/ command: '%s'\n",
+            cmd_rs);
+    if (clean_env(args) != 0)
+    {
+        fprintf(stderr, "migration: clean_env method failed.\n");
+        return 1;
+    }
+    return 1;
+}
+
+/* Clean Environment Before Exitting */
+if (clean_env(args) != 0)
+{
+    fprintf(stderr, "migration: clean_env method failed.\n");
+    return 1;
+}
+\end{lstlisting}
+Note that before exitting we call the \texttt{clean\_env} routine that removes temporary files and cleans the remaining processes.
+
+\textbf{Networking Module}
+
+From the code snippets presented in the previous lines, the reader might observe a series of calls to some seemingly unfamiliar methods like \texttt{sftp\_copy\_dir} or \texttt{ssh\_remote\_command}.
+One of the first design choices we faced was to whether follow a client-server architecture, in which a listening process would have to be running in advance in the destination machine, or run all commands from the same process.
+We decided to follow the second approach as it required less dependencies on participating nodes (none other than \criu and \runc).
+This decision implied that we would need programatic access from the main execution process to the remote node in order to: manipulate the filesystem, transfer files, and execute privileged commands.
+
+For enhanced control, we decided to implement routines to transfer files and execute remote commands using \texttt{libssh}'s API~\cite{libssh,libssh-api}.
+In particular, we expose the following API,
+\begin{itemize}
+    \item \texttt{ssh\_remote\_command}: execute a command remotely. We open an \texttt{ssh\_channel}, use the \texttt{ssh\_channel\_request\_exec} method, and capture the output. Alternatively we can also run the command in non-blocking mode. Lastly, and in order to execute \texttt{root} commands, we used two different workarounds. One first option is to, for the user we authenticate with (part of our initial assumptions), enable password-less sudo. Another one is to pass the password, in clear, over the encrypted SSH channel with a snippet like: \texttt{echo <PWD> | sudo -S <cmd>}.
+    \item \texttt{sftp\_copy\_file}: copies a file to the remote end's specified path. \texttt{libssh} only exposes very low level primitives, so we have to serialize and chunk the file, transfer it over an established \texttt{sftp} channel, rebuild it in the other end, and store it at the desired location.
+    \item \texttt{sftp\_copy\_dir}: recursively copy a directory using the previously introduced method.
+\end{itemize}
+The full implementation is again available on GitHub, but we include the signatures and a simplified implementation of the methods listed above (without the helper functions) in Listing~\ref{code:libssh}.
+
+\subsection{Usage}
+
+The usage of the tool is very straightforward.
+First, the user must ensure that the previously mentioned assumptions are met.
+This is, the container is running in the host machine, and the user has SSH access to the destination node.
+The only dependencies for the software to run are \criu and \runc.
+\texttt{libss} might or might not be available depending on the Linux flavour the user is running in.
+At the time of the writing the system has only been tested in \texttt{Debian} machines.
+When all the dependencies are met, the code can be compiled using \texttt{make all} and executed via \texttt{./migration <container> <host>}.
