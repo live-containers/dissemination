@@ -218,9 +218,7 @@ Even though they originated in the High Performance Computing environment, these
 During checkpoint, and in order to save the process' state, all the essential information such as the program's memory, file descriptors, sockets and pipes, among others are dumped.
 In the distributed scenario, additional logic is required to coordinate the checkpoint across all processes~\cite{Raynal2013}.
 
-\jg{I think that there were checkpointing solutions before the appearance of virtual machines: \url{https://en.wikipedia.org/wiki/Application_checkpointing}}
-
-The first implementations for C/R appeared in the setting of virtual machines~\cite{Clark2005}.
+Checkpoint-Restore became popular in the setting of virtual machines~\cite{Clark2005}, but had already been thoroughly studied in the context of rollback and recovery strategies~\cite{Elnozahy2002}.
 VM checkpointing is easier when compared to arbitrary process checkpointing as VMs are already isolated.
 Nowadays, and other than \criu which is our tool of choice, there are several mature C/R projects that checkpoint virtually any running process transparently to the user.
 A comparison among some of them is presented later in \S\ref{sec:bg-criu}.
@@ -238,7 +236,8 @@ Other more refined and more popular mechanisms minimize this downtime, we highli
 \textbf{Pre-Copy Migration.}
 
 Pre-copy migration, or sometimes called iterative migration, is a live migration technique that transfers most of the checkpoint information previously to stopping the running process, and only stops it once the information to transfer to the other end is minimal, achieving a very low downtime~\cite{Bradford2007}.
-As memory pages tend to be the largest resource to dump and transfer, most pre-copy implementations iteratively transfer the memory that has changed between subsequent iterations. \jg{Well, this is true assuming that the storage is shared among the nodes, so you do not need to transfer the file system.}
+As memory pages tend to be the largest resource to dump and transfer, most pre-copy implementations iteratively transfer the memory that has changed between subsequent iterations. 
+Additionally, and depending on whether the different nodes share a common file system or not, files are also incrementally dumped.
 When the information to transfer is lower than a specified threshold, the application is stopped in one end, the remaining bits sent over the wire, and resumed in the other one.
 
 \textbf{Post-Copy Migration.}
@@ -256,8 +255,7 @@ This is, given a process running in different physical hosts, how to coordinate 
 Reaching consensus among a set of distributed processes is a well-studied topic in the distributed systems field, and an existing algorithm for distributed snapshotting was presented in 1985 by Chandy and Lamport~\cite{Lamport1985}.
 Since then, more and more algorithms have been presented~\cite{Raynal2013,Kshemkalyani2008} optimizing certain aspects of the process.
 However, transparent distributed C/R is yet to be implemented in a software tool.
-The work here presented aims to be a step in this direction.
-\jg{I assume this is because of the support for established TCP connections, not because of the implementation of a distributed coordination algorithm.}
+The work here presented aims to be a step in this direction by facilitating live migration of containers with established TCP connections and external namespaces (external in the sense that are not created by the migrated process).
 
 \section{\criu: Checkpoint Restore in Userspace} \label{sec:bg-criu}
 

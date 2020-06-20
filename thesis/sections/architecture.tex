@@ -1,4 +1,4 @@
-\chapter{\projName (think of a name for the system)} \label{chap:system}
+\chapter{Implementing Efficient Live Migration} \label{chap:system}
 
 In this chapter we present our implementation of live migration of \runc containers using \criu.
 In order to achieve efficiency, liveness, and mimick a realistic setting, we explore disk-less and iterative migrations, and checkpointing established TCP connections and external namespaces.
@@ -228,8 +228,6 @@ sudo criu dump \
 \end{minipage}
 \end{figure}
 
-\jg{Mention somewhere that a threshold defines for how long the migration iterates on copying dirty memory before deciding to stop the container and do the final copy. This is probably a parameter that one can play with to tune the migration process (although we don't evaluate this in our experiments).}
-
 In order to perform a micro-benchmark of this functionality we consider two different scenarios: a simple counter written in \texttt{C}, and a \redis in-memory database, as introduced in the previous section.
 For each scenario we perform two pre-dumps, and a final dump, and report the size of the \texttt{pages-1.img} file (which contains the memory dump).
 We test a static setting in which we don't change the memory during successive dumps which acts as a baseline, and a dynamic one in which, between each dump, we modify the contents of the process memory.
@@ -252,20 +250,17 @@ In the counter case, between successive dumps we just increase the value of a va
 In the \redis one, the \texttt{redis-benchmark} is non-deterministic in nature, but it's worth observing how shuffling a percent of the total key-store propagates to higher percentages of memory re-use.
 We conclude that memory tracking is a necessary feature if any application considers even near-live migration of production applications, and the technology presented allows for an easy way to do-so.
 
-
-\subsubsection*{Aside: Memory Deduplication}
-
-Maybe not an aside, but putting it here to remember
-
-\cs{Mention that before we were optimizing a-priori, whereas this technique is a-posteriori.}
+%\subsubsection*{Aside: Memory Deduplication}
+%
+%Maybe not an aside, but putting it here to remember
+%
+%\cs{Mention that before we were optimizing a-priori, whereas this technique is a-posteriori.}
 
 %\subsection{Remote Migration}
 % CS: I forgot to comment this. I initially included it but then figured out it did not add any value since the main difference would be raw bandwidth.
 %\jg{I assume you will place here some experiments demonstrating the migration between different nodes?}
 
 \subsection{Checkpointing TCP Connections}
-
-\cs{Include snippets for the echo server in the appendix.}
 
 The ability to checkpoint established TCP connection is mainly due to the inclusion of the \texttt{TCP\_REPAIR} socket option to kernel version $3.5$~\cite{tcp-connection-repair}.
 
