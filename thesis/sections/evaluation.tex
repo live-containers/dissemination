@@ -1,26 +1,25 @@
 \chapter{Evaluation} \label{chap:evaluation}
 
 In the previous chapter, \S\ref{chap:system}, we have presented our implementation of live migration of containers using \criu and \runc, and have motivated our design choices with micro-benchmarks that fulfil the initial objectives specified in the introduction.
-
 In this chapter, we move on to evaluate the system as a whole, and how the different features interlace and work together, and  how does our system compare to traditional virtual machine live migration.
 
-\section{Macro-Benchmarks}
+In all the experiments here presented, and unless otherwise stated, we use the same experimental setup than in the micro-benchmark chapter.
+Two (if necessary) Linux Debian machines with kernel version $4.19.0-6$ running on a host-only network in VirtualBox version $5.2.34$.
+\criu version $3.13$ and \runc version $1.0.0-rc8$, both built from source.
 
-\subsection{Iterative, Remote, Diskless Migration}
-
-Goal here would be to have the diagram we went over once, in which we plot over time the amount of memory we send.
+\section{Application Downtime}
 
 \cs{Re-do the initial plot presented}
 
-\subsection{Checkpointing TCP Connections inside Network Namespaces}
-
 \cs{Include the content from Decentralized Systems}
 
-\section{Comparison with Virtual Machines Migration}
+\section{Memory Scalability}
 
-\section{Scalability}
+In this section we study the scalability of our approach with respect to the memory allocated by the to-be checkpointed container.
+For this experiment we set up a \textsc{Redis} in-memory database which we pre-load with a variable number of key-value pairs.
+We use \texttt{redis-client} and \texttt{redis-server} version $5.0.3$, and pre-load the keys using 
 
-\begin{figure}
+\begin{figure}[h!]
     \centering
     \includegraphics[width=\textwidth]{figs/key-scalability/key_scalability.pdf}
     \caption[Scalability with respect to the memory to transfer.]{Scalability with respect to the memory to transfer. We compare our system with manual live migration when running in the same machine with a one-shot migration.\label{fig:key-scalability}}
@@ -51,5 +50,11 @@ do
     # Shut down both VMs
 done
 \end{lstlisting}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figs/vm-teleport/vm_teleport.pdf}
+    \caption[Scalability comparison with VirtualBox Teleport.]{Scalability with respect to the memory to transfer. We compare our system with VM live migration using VirtualBox's Teleport functionality.\label{fig:vm-teleport}}
+\end{figure}
 
 \cs{Compare with P-Haul if time}
