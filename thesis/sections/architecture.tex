@@ -656,6 +656,9 @@ The usage of the tool is very straightforward.
 First, the user must ensure that the previously mentioned assumptions are met.
 This is, the container is running in the host machine, and the user has SSH access to the destination node.
 The only dependencies for the software to run are \criu and \runc.
-\texttt{libss} might or might not be available depending on the Linux flavour the user is running in.
+\texttt{libssh} might or might not be available depending on the Linux flavour the user is running in.
 At the time of the writing the system has only been tested in \texttt{Debian} machines.
 When all the dependencies are met, the code can be compiled using \texttt{make all} and executed via \texttt{./migration <container> <host>}.
+This ease of use is not to be overlooked, as similar tools are way more complicated to set up and get running.
+For instance, in order to migrate a process using the old \textsc{P.Haul} interface (\url{https://github.com/checkpoint-restore/p.haul/}), one must set up a NFS mount between source and destination, specify the file descriptors for both RPC and memory socket, and repeat the procedure in both nodes before even starting the script.
+Moreover, the newer interface (\url{https://github.com/checkpoint-restore/go-criu/tree/master/phaul}) does not even allow for standalone excution as it has to be included in a Go project.
