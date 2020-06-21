@@ -9,17 +9,37 @@ Two (if necessary) Linux Debian machines with kernel version $4.19.0-6$ running 
 
 \section{Application Downtime}
 
-\cs{Breakdown a single execution}
+In this section we study the impact of the threshold value we set to stop the iterative migration and dump the application in the total downtime.
+As previously introduced in the \textit{Iterative Migration} section from \S\ref{sec:arch-blocks}, we establish an arbitrary parameter to decide when to stop transferring only memory dumps (\textit{i.e.} pre-dumping the container process) and checkpoint, hence freeze, and migrate the application to the remote host.
+A reasonable rule of thumb is to establish a memory cap, and whenever the successive dumps are smaller than said cap, trigger the threshold and exit the loop.
+However, a hard-coded value would be very ad-hoc to our experimental setup.
+Therefore, we have benchmarked the impact of setting a variable memory cap to the total downtime.
+The values we choose are proportional to the size of the initial allocated memory pool.
 
-\cs{Compare as we vary the dumping threshold}
+In order to test this feature we set up the following experiment.
+We deploy an in-memory \textsc{Redis} database with 1e6 keypairs which result in an allocated memory (for all the container) of several hundreds of MB.
+We use \texttt{redis-client} and \texttt{redis-server} version $5.0.3$.
+For each run, we set a percentage of the initial memory as our threshold value, and report the total application downtime and a breakdown of the time spent (in percentage) during the last dump of each iteration.
+In particular we measure the time spent dumping the memory (\texttt{dump}), preparing the migration (\texttt{prepare}), transferring files to the other host (\texttt{transfer}) and during restore (\texttt{restore}).
+We present our results in Figure~\ref{fig:downtime}.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{./figs/downtime/downtime.pdf}
+    \caption[Application Downtime Relative to Threshold]{Application downtime relative to the memory threshold cap (dotted red), and stacked histogram of the time spent in each phase during the last dump.\label{fig:downtime}}
+\end{figure}
+
+We observe that, for our particular setting, once the memory cap reaches $10\%$ of the original size, the application downtime reaches the baseline value.
+Moreover it is also interesting to see that, as this value gets closer to the baseline, the time spent (absolute and relative) dumping memory decreases.
+This results are specific to our setting with two virtual machines and limited memory, but a similar benchmark could be reproduced in production to estimate an adequate threshold value.
 
 \section{Memory Scalability}
 
 In this section we study the scalability of our approach with respect to the memory allocated by the to-be checkpointed container.
 For this experiment we set up a \textsc{Redis} in-memory database which we pre-load with a variable number of key-value pairs.
-We use \texttt{redis-client} and \texttt{redis-server} version $5.0.3$, and pre-load the keys using the \texttt{--pipe} flag for bulk data upload.
+We use, similarly to the previous section, \texttt{redis-client} and \texttt{redis-server} version $5.0.3$, and pre-load the keys using the \texttt{--pipe} flag for bulk data upload.
 In Listing~\ref{code:redis-bulk-upload} we include the script for doing so.
-Note that this same strategy was also used in the micro-benchmarks using \textsc{Redis}.
+Note that this same strategy was also used in other benchmarks using \textsc{Redis}.
 \begin{lstlisting}[style=Bash,caption={Snippet for bulk data upload to a Redis database.},label={code:redis-bulk-upload}]
 #!/bin/bash
 
