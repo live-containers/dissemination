@@ -1,5 +1,5 @@
 #!/bin/bash
-awk 'NF && $1!~/^#/' local_benchmark.dat | \
+awk 'NF && $1!~/^#/' key_scalability.dat | \
 awk 'BEGIN { FS="," }
     {sum_cp += $1;
       sum_rs += $2;
