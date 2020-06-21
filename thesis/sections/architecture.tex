@@ -22,7 +22,7 @@ As previously detailed, \criu builds the snapshot of a running process using ima
 As a consequence, it relies heavily on the underlying storage facility provided which, in most commodity PCs, tends to be the disk-backed file system.
 It is of no surprise then, that reading and writing from and to disk can quickly become the bottleneck in live migration performance.
 It gets even worse when writes are duplicated, \textit{i.e.} we write once to disk to dump the process state, and a second time to transfer image files wherever they need to be restored.
-To overcome the former, we rely on \texttt{tmpfs} a virtual memory filesystem~\cite{tmpfs-manpage}.
+To overcome the former, we rely on \texttt{tmpfs} a virtual memory file system~\cite{tmpfs-manpage}.
 For the latter, we leverage \criu's \texttt{page-server}.
 
 % TMPFS
@@ -31,16 +31,16 @@ According to the Linux Programmer's Manual~\cite{tmpfs-manpage}, this file syste
 Since the files actually reside in memory, the user benefits from memory-like read/write performance.
 A notable use of \texttt{tmpfs} is \texttt{/dev/shm}, used in the POSIX-compliant implementation of shared memory and in POSIX semaphores.
 One such file system can be easily created and destroyed using \texttt{mount} and \texttt{umount} as detailed in Listing~\ref{code:tmpfs-example}
-\begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} filesystem.\label{code:tmpfs-example}}]
+\begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} file system.\label{code:tmpfs-example}}]
 #!/bin/bash
-# Mount a tmpfs filesystem rooted in the /tmp/my-tmpfs directory with maximum size 100 MB
+# Mount a tmpfs file system rooted in the /tmp/my-tmpfs directory with maximum size 100 MB
 mkdir /tmp/my-tmpfs
 sudo mount -t tmpfs -o size=100M tmpfs /tmp/my-tmpfs
 
 # Check the new file system appears in the list of mounted devices
 sudo mount | grep /tmp/my-tmpfs
 
-# Unmount the filesystem 
+# Unmount the file system 
 sudo umount /tmp/my-tmpfs # CAUTION: THIS WILL DESTROY THE CONTENTS
 \end{lstlisting}
 
@@ -264,7 +264,7 @@ We conclude that memory tracking is a necessary feature if any application consi
 
 The ability to checkpoint established TCP connection is mainly due to the inclusion of the \texttt{TCP\_REPAIR} socket option to kernel version $3.5$~\cite{tcp-connection-repair}.
 
-Similarly to other resources and as introduced in \S\ref{chap:background}, basic information about sockets is obtained by parsing the adequate files in the \texttt{/proc} filesystem.
+Similarly to other resources and as introduced in \S\ref{chap:background}, basic information about sockets is obtained by parsing the adequate files in the \texttt{/proc} file system.
 However, there are some internals of active network connections (namely negotiated parameters such as send and receive queues, and sequence numbers) that require putting the socket in the \texttt{TCP\_REPAIR} state using the \texttt{setocketopt()} syscall (note that this action requires \texttt{CAP\_NET\_ADMIN} capabilities).
 Then, if the connection is closed whilst the socket is in \texttt{TCP\_REPAIR} mode, no \texttt{FIN} nor \texttt{RST} packets are sent to the other peer, what means that his endpoint is effectively still open~\cite{Corbet12}.
 
@@ -469,7 +469,7 @@ We leave this for future work.
 
 \subsection{High Level Specification}
 
-We have implemented a tool that, given a container name and a remote server, migrates execution from the host where the command is run, to the one specified in the argument list.
+We have implemented a tool that, given a container name and a remote server, migrates execution from the host where the command is run to the one specified in the argument list.
 In particular, it checkpoints the container, transfers the image files over the network, and restores remotely the execution.
 As optional parameters, the user might specify whether they prefer diskless or file-based migration (defaults to diskless), iterative or one shot (defaults to iterative), and the path where intermediate files will be stored.
 
@@ -484,16 +484,16 @@ Note that this assumption could be easily circunvented pre-generating the bundle
 The procedure to create a \texttt{rootfs} bundle is very straightforward and we include an example in Listing~\ref{code:runc-bundle}.
 \begin{lstlisting}[style=Bash,caption={Commands to generate an OCI bundle to run a container using \runc.\label{code:runc-bundle}}]
 #!/bin/bash
-// Create a new directory for the container
+# Create a new directory for the container
 mdkir ./my-container && cd my-container
 
-// Create a root filesystem
+# Create a root file system
 mkdir rootfs
 
-// Export the docker image into the root filesystem
+# Export the docker image into the root file system
 docker export `docker create <image-tag>` | tar -C rootfs -xvf -
 
-// Generate the config file using the OCI runtime tool
+# Generate the config file using the OCI runtime tool
 oci-runtime-tool generate <args>
 \end{lstlisting}
 Lastly, it is worth mentioning that the support for rootless containers is still work-in-progress in the \criu project~\cite{criu-user-mode}.
@@ -514,9 +514,9 @@ We also allow for a series of optional parameters.
 Firstly, the user might choose to perform a one-shot migration, rather than an iterative one, and the path to store intermediate results can also be determined at this stage.
 Second, the user can opt to not use diskless migration and persist intermediate files.
 In the event of a diskless migration, the parameters (address and port) where the page server runs also can be determined.
-Lastly, the user can also specify a directory where to mount the \texttt{tmpfs} filesystem.
+Lastly, the user can also specify a directory where to mount the \texttt{tmpfs} file system.
 Otherwise the system will default to, if available, \texttt{/dev/shm}.
-For the remaining of the walkthrough we will assume the default parameters are set: diskless, iterative migration, with a page server running in the remote end and relying on \texttt{/dev/shm} as our \texttt{tmpfs} filesystem of choice.
+For the remaining of the walkthrough we will assume the default parameters are set: diskless, iterative migration, with a page server running in the remote end and relying on \texttt{/dev/shm} as our \texttt{tmpfs} file system of choice.
 
 The most important part in the migration procedure is a loop that periodically and whilst the amount of memory to transfer exceeds a threshold does the following:
 \begin{enumerate}
@@ -639,10 +639,10 @@ Note that before exitting we call the \texttt{clean\_env} routine that removes t
 From the code snippets presented in the previous lines, the reader might observe a series of calls to some seemingly unfamiliar methods like \texttt{sftp\_copy\_dir} or \texttt{ssh\_remote\_command}.
 One of the first design choices we faced was to whether follow a client-server architecture, in which a listening process would have to be running in advance in the destination machine, or run all commands from the same process.
 We decided to follow the second approach as it required less dependencies on participating nodes (none other than \criu and \runc).
-This decision implied that we would need programatic access from the main execution process to the remote node in order to: manipulate the filesystem, transfer files, and execute privileged commands.
+This decision implied that we would need programatic access from the main execution process to the remote node in order to: manipulate the file system, transfer files, and execute privileged commands.
 
 For enhanced control, we decided to implement routines to transfer files and execute remote commands using \texttt{libssh}'s API~\cite{libssh,libssh-api}.
-In particular, we expose the following API,
+In particular, we expose the following API calls,
 \begin{itemize}
     \item \texttt{ssh\_remote\_command}: execute a command remotely. We open an \texttt{ssh\_channel}, use the \texttt{ssh\_channel\_request\_exec} method, and capture the output. Alternatively we can also run the command in non-blocking mode. Lastly, and in order to execute \texttt{root} commands, we used two different workarounds. One first option is to, for the user we authenticate with (part of our initial assumptions), enable password-less sudo. Another one is to pass the password, in clear, over the encrypted SSH channel with a snippet like: \texttt{echo <PWD> | sudo -S <cmd>}.
     \item \texttt{sftp\_copy\_file}: copies a file to the remote end's specified path. \texttt{libssh} only exposes very low level primitives, so we have to serialize and chunk the file, transfer it over an established \texttt{sftp} channel, rebuild it in the other end, and store it at the desired location.
