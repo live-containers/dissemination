@@ -18,11 +18,38 @@ Goal here would be to have the diagram we went over once, in which we plot over 
 
 \section{Comparison with Virtual Machines Migration}
 
-\cs{Recreate the plot in ~\cite{Clark2005}}
-
 \section{Scalability}
 
 \begin{figure}
     \centering
-    \includegraphics[width=\textiwdth]{
+    \includegraphics[width=\textwidth]{figs/key-scalability/key_scalability.pdf}
+    \caption[Scalability with respect to the memory to transfer.]{Scalability with respect to the memory to transfer. We compare our system with manual live migration when running in the same machine with a one-shot migration.\label{fig:key-scalability}}
 \end{figure}
+
+\cs{Downtime as we increase the number of iterations (i.e. threshold)}
+
+\cs{Comparison with VM Teleport}
+
+\begin{lstlisting}[style=Bash,caption={Script to teleport a VirtualBox VM, and run the macrobenchmark.},label={code:vm-teleport}]
+#!/bin/bash
+
+# Configure target machine to wait for a teleport request to arrive
+VBoxManage modifyvm 'CRIU-Debian-Teleport-Target' --teleporter on --teleporterport 6000
+
+# Iterate over the different number of keys
+for num_keys in 1 10 100 1000 10000 100000 1000000 10000000
+do
+    # Start the host machine as usual
+    ssh <HOST_VM>
+    cd ~/runc-containers/redis && ./run_redis.sh 100000
+
+    # Start the target machine, if using a normal start, a process dialog will appear
+
+    # Run the migration
+    time VBoxManage controlvm 'CRIU-Debian' teleport --host localhost --port 6000
+
+    # Shut down both VMs
+done
+\end{lstlisting}
+
+\cs{Compare with P-Haul if time}
