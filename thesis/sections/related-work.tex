@@ -33,13 +33,13 @@ Lastly, \runc is on track  with the OCI container runtime specification, which i
 
 \section{Checkpoint Restore and \criu} \label{sec:rw-criu}
 
-Checkpoint-Restore being a technique (application checkpointing) rather than a tool, makes the topic that much vague for it's research.
+Checkpoint-Restore being a technique (application checkpointing) rather than a tool, makes the topic that much vague for its research.
 A good starting point is the definition in the Encyclopedia of Parallel Computing~\cite{Schulz2011}.
 We have also greatly leveraged a set of slides by Brandon Barker from Cornell University~\cite{Barker2014}.
 There, the author does a non-scientific introduction and motivation for C/R, and goes on to cover the different available tools as of December 2014.
 Albeit slightly old, most of the works he cites (DMTCP, \criu, and BLCR) are still the \textit{de facto} alternatives when doing application checkpointing.
 The author's approach is biased towards high performance computing, where DMTCP~\cite{dmtcp} is the usual software of choice, but it does a great job at pointing out the differences between each solution.
-For a detailed survey on the origins of C/R in the context of rollback recovery strategies for fault-tolerant systems, we highlight the work by Elnozahy \textit{et. al.} from 2002~\cite{Elnozahy2002}.
+For a detailed survey on the origins of C/R in the context of rollback recovery strategies for fault-tolerant systems, we highlight the work by Elnozahy \textit{et al.} from 2002~\cite{Elnozahy2002}.
 The techniques there described started gaining traction with Virtual Machine's migration, a topic for which Clark's survey is also a great source of information~\cite{Clark2005}.
 
 We chose to use \criu as our C/R tool, as it was the most suitable one in the container scenario, and was already used by the major container engines and runtimes (although with different degrees of integration and active maintenance).
@@ -69,20 +69,20 @@ We would like to highlight the works by Raynal~\cite{Raynal2013} and Kshemkalyan
 
 \section{Applications of C/R and Live Migration} \label{sec:rw-app}
 
-Even thoguh C/R and live migration are a relatively mature topic of research, scientific contributions covering particular applications are way more scarce.
+Even though C/R and live migration are a relatively mature topic of research, scientific contributions covering particular applications are way more scarce.
 This was, among others, one of our initial motivations for this work.
 Some of the earlier pieces of research stem from the same research group developing DMTCP.
 Being HPC the target community for the project, one of the most popular applications of DMTCP is checkpointing of MPI applications.
-The first references date from 2002~\cite{Bosilca2002}, but the first contribution from the DMTPC team did not appear until 2016 in the work by Arya \textit{et. al.}~\cite{Arya2016}, which finally resulted in \textit{MANA for MPI: MPI-Agnostic Network-Agnostic Transparent Checkpointing}~\cite{Garg2019}.
+The first references date from 2002~\cite{Bosilca2002}, but the first contribution from the DMTPC team did not appear until 2016 in the work by Arya \textit{et al.}~\cite{Arya2016}, which finally resulted in \textit{MANA for MPI: MPI-Agnostic Network-Agnostic Transparent Checkpointing}~\cite{Garg2019}.
 This last piece of work summarizes all the previous contributions as it allows for transparent checkpointing of any MPI implementation and network combination.
 The current lines of research focus on proving this approach's scalability and GPU checkpointing.
 
 For application-oriented projects leveraging \criu we would like to highlight the work by Venkatesh~\cite{Venkatesh2019}.
-This contribution is relevant to our work as it focuses on fast and efficient checpoint-restore for Docker containers.
+This contribution is relevant to our work as it focuses on fast and efficient checkpoint-restore for Docker containers.
 In particular, the authors present and optimization to the file-based image procedure using the new (as of 2019) kernel support for multiple independent virtual addresses space (MVAS).
 We can not leverage the findings in our project as it only focuses on single-machine C/R.
 
-Another interesting application of \criu for Docker container migration is the recent article by Antonio Barbalace \textit{et. al.}~\cite{Barbalace2020}.
+Another interesting application of \criu for Docker container migration is the recent article by Antonio Barbalace \textit{et al.}~\cite{Barbalace2020}.
 In this work the authors aim to overcome the limitation in migration for edge computing imposed by the different instruction set architectures (ISAs) each node may have.
 To achieve this goal they rely on containerization and \criu.
 Our work focuses on live migration of server-side oriented services, hence why the edge computing use case is not directly applicable.
@@ -93,7 +93,7 @@ These services can be encapsulated in either virtual machines or containers with
 A contribution to \criu which stemmed from an application use case and which we could leverage in the project was presented by Stoyanov in 2018~\cite{Stoyanov2018}.
 The author optimizes downtime during container live migration by utilizing \criu's newly added feature: the image cache/proxy.
 Another article covering efficient live migration of Docker containers was presented in late 2019 by Zeynep and Pelin~\cite{Zeynep2019}.
-The authors focus on the support for C/R implemeneted in Docker and focus on securing the migration process to protect against potential attacks.
+The authors focus on the support for C/R implemented in Docker and focus on securing the migration process to protect against potential attacks.
 Although the security approach is novel in nature, the fact that the authors use the outdated and not-maintained Docker integration of \criu's C/R makes it not-reusable for our project.
 
 Also in the HPC domain, but focused on container migration, lie the pieces of work by Berg~\cite{Berg2017}, and Sindi~\cite{Sindi2019}.

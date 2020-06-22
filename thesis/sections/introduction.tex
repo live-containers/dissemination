@@ -33,7 +33,7 @@ The main goal of this work is to implement efficient live migration of running c
 The terms \textit{efficient} and \textit{live} are vague in the absence of concise metrics, and the variety of running containers is also huge, as a consequence we specify a set of objectives we want our system to fulfill.
 In particular, our key metric of success downtime.
 Downtime measures for how long a migrated application is not running, and as a consequence it is a direct indicator of liveness.
-Additionally, we measure efficiency as the (lack of) reduncancy and overhead our system introduces, usually in terms of allocated (and duplicated) memory and disk usage.
+Additionally, we measure efficiency as the (lack of) redundancy and overhead our system introduces, usually in terms of allocated (and duplicated) memory and disk usage.
 We evaluate it on absolute terms, and also relatively when compared with virtual machine migration and native (manual) container migration.
 Our main objectives for the project can be summarized in the following list:
 \begin{itemize}

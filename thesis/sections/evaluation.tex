@@ -54,7 +54,7 @@ cat "./data/file.dat" | redis-cli -h `< .ip` --pipe
 Our goal is to evaluate the impact of the size of the memory allocated to the overall container downtime.
 In order to compare against a naive live migration (checkpoint, transfer files, and restore on the remote end) and traditional virtual machine migrations, we choose not to use iterative migration in our system.
 This is due to the fact that it would be an unfair advantage against the other two systems.
-Additionally, and in order to avoid noise introduced by the network latency, we run migrations locally (\textit{i.e.} transfering files to $127.0.0.1$).
+Additionally, and in order to avoid noise introduced by the network latency, we run migrations locally (\textit{i.e.} transferring files to $127.0.0.1$).
 We measure the application's downtime (time to checkpoint plus time to restore) when running an in-memory \textsc{Redis} database pre-loaded with key-value pairs of sizes raging $16 B$ for one pair to $265 MB$ for $1e7$ pairs.
 
 \textbf{Comparison Against Naive Live Migration.}
@@ -70,7 +70,7 @@ We report the downtime for this approach and our system when ran with only one i
 
 From our results we are able to extract different conclusions.
 First of all, the time to restore is negligible when compared to the time to checkpoint/dump the container.
-Secondly, even though our library introduces a small overhead, around $0.1$ seconds, to the baseline, this proofs efective in the long run when the application downtime is reduced by a factor of five.
+Secondly, even though our library introduces a small overhead, around $0.1$ seconds, to the baseline, this proofs effective in the long run when the application downtime is reduced by a factor of five.
 Lastly, we also observe that a user will specially benefit from using a specialized live migration library like ours over the manual approach whenever the container to checkpoint is resource-eager.
 
 \textbf{Comparison Against Virtual Machine Migration}
