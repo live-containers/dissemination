@@ -33,7 +33,7 @@ We observe that, for our particular setting, once the memory cap reaches $10\%$ 
 Moreover it is also interesting to see that, as this value gets closer to the baseline, the time spent (absolute and relative) dumping memory decreases.
 This results are specific to our setting with two virtual machines and limited memory, but a similar benchmark could be reproduced in production to estimate an adequate threshold value.
 
-\section{Memory Scalability} \label{sec:eval-memory}
+\section{Scalability with the Container's Memory Size} \label{sec:eval-memory}
 
 In this section we study the scalability of our approach with respect to the memory allocated by the to-be checkpointed container.
 For this experiment we set up a \textsc{Redis} in-memory database which we pre-load with a variable number of key-value pairs.
@@ -119,3 +119,8 @@ However, what is also worth noticing is the scalability.
 Whilst our system (for which we re-plot the same results from Figure~\ref{fig:key-scalability}), experiences an increase in downtime of $\times 1.5$, VirtualBox's experiences a downtime closer to $\times 2$ (whilst naive migration had one closer to $\times 10$).
 This result shows that, even with a drastically smaller overhead, our system also showcases a better scalability when compared to traditional VM migration.
 
+The improvements from our library with respect to naive and VM migration can be understood from the following facts.
+When compared to native migration, our system does not rely on files written to disk, neither duplicates memory allocation.
+This adds a small overhead to the baseline, but drastically improves scalability.
+When compared to VM migration, the difference in baselines comes from the way larger set of files VirtualBox has to copy in order to restore the machine.
+Furthermore, the slight gains in scalability probably come from the completely diskless migration we employ.
