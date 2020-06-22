@@ -20,7 +20,7 @@
 \normalsize
 Containers have become the go-to technology for managing application's lifecycle in the cloud.
 As a consequence, cloud-tenants are becoming increasingly interested in advanced load-balancing strategies to optimize resource usage and guarantee good quality of service.
-Live migration is a technique to halt the execution of a program and resume it in the same state in a different location.
+Live migration is a technique to halt the execution of a program and resume it in the same state in a different location without disrupting the program's availability.
 It relies on checkpoint-restore tools to snapshot an application's state.
 Checkpoint-Restore in Userspace (CRIU) is one of such tools, designed to work transparently to the user, entirely from userspace, and specialized for containers.
 
@@ -63,7 +63,7 @@ As a consequence, we believe our migration technique for \criu and \runc is a fe
 
 Els contenidors de programari han esdevingut la tecnologia referent per gestionar aplicacions al n\'uvol.
 Com a conseq\"u\`encia, els principals prove\"idors de servei estan cada vegada m\'es interessats en solucions per gestionar dits contenidors, i oferir garanties de qualitat als seus usuaris.
-La migraci\'o d'aplicacions consisteix en aturar un proc\'es i reiniciar-lo a un altre entorn d'execuci\'o en el mateix punt en el que s'havia aturat.
+La migraci\'o d'aplicacions consisteix en aturar un proc\'es i reiniciar-lo a un altre entorn d'execuci\'o en el mateix punt en el que s'havia aturat sense interrompre'n el proc\'es d'execuci\'o.
 Es basa en la capacitat de generar captures de l'estat d'execuci\'o d'un proc\'es.
 \textit{Checkpoint-Restore in Userspace (CRIU)} \'es un projecte de codi obert que permet obtenir dites captures de manera transparent a l'usuari, sense modificar-ne el kernel, i especialitzada en contenidors.
 
