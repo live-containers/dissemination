@@ -5,7 +5,7 @@ With the progressive shift from bare-metal, to virtualized servers, and now with
 A key aspect to achieving a good QoS is the ability to manage resources efficiently, in particular load-balancing.
 Having the ability to manage workloads efficiently, cloud providers can provide high-priority tasks the resources they demand, and starve less important ones until other resources become available.
 Additionally, sharing and managing physical resources utilization, in particular ensuring that there are no severe imbalance among computing nodes, yet only the necessary ones are not idle, has a direct impact on energy savings for the data center.
-The virtual machine (VM) placement problem~\cite{Masdari2016,Strunk2012} has studied this same issue for decades, the appearance of containers includes yet another variable to the optimization problem. 
+The virtual machine (VM) placement problem~\cite{Masdari2016,Strunk2012} has studied this same issue for decades, the appearance of containers includes yet another variable to the optimization task. 
 
 Checkpoint-Restore is, through live migration, a technique to provide application-level load-balancing capabilities to cloud tenants transparently to the user.
 By dumping the state of an application and restoring it in another physical instance, it will resume from the exact point it was dumped at.
@@ -25,13 +25,13 @@ Then, we provide a library implementing live migration of running and connected 
 Our implementation is very easy to use, has minimal dependencies, requires minimal set up, and differs from other existing solutions~\cite{phaul-github} in the fact that no listening process needs to be running in the remote end.
 We support diskless, iterative (pre-copy) migration of memory intensive containers with established TCP connections and external namespaces.
 Moreover, we back all of our design choices with an extensive evaluation in the form of micro and macro benchmarks and a comparison with traditional virtual machine migration.
-It is open-sourced, still under development, and available at \url{https://github.com/live-containers/live-migration}.
+Our system is open-source, still under development, and available at \url{https://github.com/live-containers/live-migration}.
 
 \section{Objectives, Tasks, and Contributions}
 
 The main goal of this work is to implement efficient live migration of running containers.
 The terms \textit{efficient} and \textit{live} are vague in the absence of concise metrics, and the variety of running containers is also huge, as a consequence we specify a set of objectives we want our system to fulfill.
-In particular, our key metric of success downtime.
+In particular, our key metric of success is downtime.
 Downtime measures for how long a migrated application is not running, and as a consequence it is a direct indicator of liveness.
 Additionally, we measure efficiency as the (lack of) redundancy and overhead our system introduces, usually in terms of allocated (and duplicated) memory and disk usage.
 We evaluate it on absolute terms, and also relatively when compared with virtual machine migration and native (manual) container migration.
@@ -43,8 +43,9 @@ Our main objectives for the project can be summarized in the following list:
 \end{itemize}
 
 In order to achieve \textbf{O1}, \textbf{O2}, and \textbf{O3}, we define a series of tasks our implementation presented in \S\ref{chap:system} must fulfil.
-Note that these objectives and tasks are only implementation-oriented, but part of the contribution of this work is also bibliographical in the sense that we cover all the relevant material that helps us in the process of achieving the objectives.
-This non-tangible tasks and objectives are included in the final list of contributions.
+Note that these objectives and tasks are only implementation-oriented.
+Part of the contribution of this work are also bibliographical in the sense that we cover all the relevant material that helps us in the process of achieving the objectives.
+These non-tangible tasks and objectives are included in the final list of contributions.
 \begin{itemize}
     \item[\textbf{T1}] Implement support to migrate interactive, memory-intensive, containers.
     \item[\textbf{T2}] Implement support to migrate containers with established TCP connections and external namespaces.
@@ -71,19 +72,19 @@ Note that \runc is covered in detail when discussing different container engines
 
 In Chapter~\ref{chap:related-work}, we cover relevant bibliography and related work.
 As the goal of a Master's thesis is educational in nature, we have decided to include not only other scientific contributions related to container checkpointing and live container migration, but also all the bibliographical material that we have used.
-These references are both informative and educational, and will enable an interested reader to follow our same educational journey which, in a document of this sort, is not to be underestimated.
+These references are both informative and educational, and will enable an interested reader to follow our same learning process which, in a document of this sort, is not to be underestimated.
 In particular, we cover relevant bibliography on containers (\S\ref{sec:rw-cont}), \criu and C/R (\S\ref{sec:rw-criu}), and applications in live migration (\S\ref{sec:rw-app}).
 
 In Chapter~\ref{chap:system} we present the building blocks of our system (\S\ref{sec:arch-blocks}): diskless migration, iterative migration, and TCP and namespace migration.
-For each concept, we present it's underlying concept together with a shell script to leverage it, it's implementation details in \criu, and the integration with \runc.
+For each concept, we present it's underlying theory together with a shell script to leverage it, it's implementation details in \criu, and the integration with \runc.
 Additionally, we micro-benchmark it's functionality comparing the vanilla performance with \criu's and \runc's.
 Then, in~\S\ref{sec:system} we cover in detail the implementation details of our solution, covering the most relevant code snippets, motivating our design choices (mostly with results from the previous section) and covering some helper modules we also implemented.
 
 In Chapter~\ref{chap:evaluation} we put our system to work and, instead of micro benchmarking particular features, we evaluate it as a whole through two different macro benchmarks.
-First, in~\S\ref{sec:eval-memory}, we assess the impact different design choices have on the overall application downtime.
+First, in~\S\ref{sec:eval-downtime}, we assess the impact different design choices have on the overall application downtime.
 Downtime is the key metric in live migration as it assesses the time the application is not running.
 Minimizing it is, in turn, the ultimate goal of efficient live migration.
-Secondly, in~\S\ref{sec:eval-downtime}, we measure our system's scalability with regard to the memory allocated by the container.
+Secondly, in~\S\ref{sec:eval-memory}, we measure our system's scalability with regard to the memory allocated by the container.
 If downtime is the key metric to optimize, memory dumps and network latency are the two biggest bottlenecks.
 Efficient network transport is out of the scope for this project, hence in this second macro-benchmark we focus on the efficiency of memory dumps.
 
