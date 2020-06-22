@@ -1,7 +1,7 @@
 \chapter{Background Concepts} \label{chap:background}
 
 The main goal of this project is to implement live migration of running containers.
-It builds on the concepts of containers, checkpointing, and it's implementation in the \criu project.
+It builds on the concepts of containers, checkpointing, and its implementation in the \criu project.
 This chapter provides a detailed introduction to these concepts as they are necessary to understand the presented contributions.
 
 \section{Containers} \label{sec:containers}
@@ -54,9 +54,9 @@ As of Kernel 5.6, there are eight different types of namespaces, which we presen
         \texttt{mnt} & \textbf{Mount namespaces} provide isolation of the list of mount points seen by the process in each namespace instance. It allow processes to have their own root file system and mount and unmount file systems without affecting the rest of the system. \\[3pt]
         \texttt{pid} & The \textbf{process ID} isolates the PID number space. This means that two processes in different PID namespaces can have the same identifier. It is very useful in container migration as it allows to restore the processes with the same PID they were dumped with regardless of whether that ID might be taken in the target machine or not. \\[3pt]
         \texttt{net} & \textbf{Network namespaces} provide isolation of the whole network stack. In particular network devices, interfaces, routing tables, iptables rules, and sockets. \\[3pt]
-        \texttt{ipc} & The \textbf{Interprocess Comunication namespace} provides isolation for POSIX semaphore queues, semaphore sets and shared memory segments.\\[3pt]
+        \texttt{ipc} & The \textbf{Interprocess Communication namespace} provides isolation for POSIX semaphore queues, semaphore sets and shared memory segments.\\[3pt]
         \texttt{uts} & The \textbf{UNIX Time Sharing namespace} allows processes to set a hostname or domainname for that particular namespace without affecting the rest of the system. \\[3pt]
-        \texttt{user} & \textbf{User namespaces} isolate security-related identifiers such as user and group identifiers (UID, GID) and capabilities. This allows for a process to have privileges within a certain namespace but not outside it's scope. \\[3pt]
+        \texttt{user} & \textbf{User namespaces} isolate security-related identifiers such as user and group identifiers (UID, GID) and capabilities. This allows for a process to have privileges within a certain namespace but not outside its scope. \\[3pt]
         \texttt{cgroup} & The \textbf{Control Group namespace} virtualizes the contents of \texttt{/proc/self/cgroup}. As a consequence each different namespace has a different cgroup root directory.\\[3pt]
         \texttt{time} & The \textbf{time namespace} has been the latest addition to the group. Included in Kernel 5.6, it allows different namespaces to have different offsets to the system monotonic and boot-time clock.\\[3pt]
         \hline
@@ -143,8 +143,8 @@ It is a running instance of a \emph{container image}, a (set of) files that are 
 To enhance portability and vendor interoperability, images are stored using a standardized format by the Open Container Initiative (OCI, \url{https://opencontainers.org/}), an open governance structure for container-related standards.
 The \emph{container engine} turns the image into a running container and acts as the interaction point with the user.
 However, engines don't tend to actually instantiate the containers themselves, and rather rely on a \textit{container runtime}.
-The runtime is the lower level component that interacts with the kernel, it's specification~\cite{container-runtime-specification} is also maintained and developed by the OCI.
-\runc is it's reference implementation, and our tool of choice to implement live migration.
+The runtime is the lower level component that interacts with the kernel, its specification~\cite{container-runtime-specification} is also maintained and developed by the OCI.
+\runc is its reference implementation, and our tool of choice to implement live migration.
 We have chosen to skip the engine layer and interact with the runtime as support for advanced \criu features is lacking in higher-level tools (more details on \criu are presented in \S\ref{sec:bg-criu}).
 
 \subsubsection*{Different Container Engines and Runtimes}
@@ -154,13 +154,13 @@ There are a variety of container engines available.
 It is most likely the best-known tool and the main responsible to the rapid adoption of the technology.
 However, there are several alternatives.
 
-Given it's pivotal importance, we differentiate between container engines that rely on \runc as their runtime of choice, and those which don't.
+Given its pivotal importance, we differentiate between container engines that rely on \runc as their runtime of choice, and those which don't.
 
 \textbf{\runc-based Container Engines.}
 
 Other than \texttt{Docker}, \texttt{cri-O} (\url{https://cri-o.io/}) is a container engine focused on the integration of lightweight containers with the Kubernetes orchestrator.
 \texttt{Podman} (\url{https://podman.io/getting-started/}) is another alternative to \texttt{Docker}.
-It's main distinguishing factor is that it is a \textit{daemonless} container engine.
+Its main distinguishing factor is that it is a \textit{daemonless} container engine.
 Lastly, \texttt{rkt} (\url{https://github.com/rkt/rkt}) is a project with pluggability, interoperability, and customization in mind.
 Unfortunately, it has reached end-of-life and is not currently maintained.
 
@@ -170,7 +170,7 @@ Unfortunately, it has reached end-of-life and is not currently maintained.
 This is, instead of relying on standard container isolation techniques, they use VM-native isolation (hardware-backed) to provide further security guarantees.
 In particular, each container is hypervisor-isolated, meaning two different containers have different kernels.
 \texttt{crun} (\url{https://github.com/containers/crun}) is a re-implementation of \runc in C.
-It's main focus is on performance and memory footprint.
+Its main focus is on performance and memory footprint.
 In both cases \texttt{crun} surpasses \runc.
 \texttt{railcar} (\url{https://github.com/oracle/railcar}) is another runtime implementation born from the idea that \textsc{Go} might not be the best programming language to implement a container runtime.
 With memory safety in mind, Oracle, the company behind \texttt{railcar}, decided to implement an OCI-compliant runtime in \textsc{Rust}.
@@ -260,7 +260,7 @@ The work here presented aims to be a step in this direction by facilitating live
 \section{\criu: Checkpoint Restore in Userspace} \label{sec:bg-criu}
 
 Checkpoint/Restore in Userspace (\criu) is an open-source C/R tool~\cite{criu-main-page}.
-Introduced in 2011, it's distinctive feature is that it is mainly implemented in user space, rather than in the kernel, by using existing interfaces~\cite{Reber2016}.
+Introduced in 2011, its distinctive feature is that it is mainly implemented in user space, rather than in the kernel, by using existing interfaces~\cite{Reber2016}.
 One of the most important interface is \texttt{ptrace}~\cite{ptrace-manpage}, as it relies on it for seizing the target process.
 For other interfaces, several patches have been pushed to the mainline kernel by \criu developers~\cite{criu-kernel-patches}.
 The project is currently under active development~\cite{criu-github}, and its main focus is to support the migration of containers.
@@ -272,7 +272,7 @@ The main goal of \criu is to perform a snapshot the current process' tree state 
 \subsubsection*{Checkpoint}
 
 The checkpointing process starts with the process identifier (PID) of a process group leader provided by the user through the command line using the \texttt{--tree} option~\cite{criu-checkpoint}.
-However, before it can actually start, we need to ensure that the process does not change it's state during checkpoint.
+However, before it can actually start, we need to ensure that the process does not change its state during checkpoint.
 This includes: opening file descriptors, changing sessions, or even producing new child processes~\cite{criu-freeze}.
 To achieve this transparently, instead of sending a stop signal (which could affect the process' state) \criu freezes tasks using \texttt{ptrace}'s \texttt{PTRACE\_SEIZE} command~\cite{ptrace-manpage}.
 In order to find all active tasks descendant of the parent PID, the \texttt{\$pid} dumper iterates through each \texttt{/proc/\$pid/task/} entry, recursively gathering threads and their children from \texttt{/proc/\$pid/task/\$tid/children}.
@@ -281,16 +281,16 @@ Once all tasks are frozen, \criu collects all the information it can about the t
 File descriptors and registers are dumped through a \texttt{ptrace} interface and are parsed from \texttt{/proc/\$pid/fd} and \texttt{/proc/\$pid/stat} respectively.
 In order to dump the contents of memory and credentials, a novel technique is introduced, the \textbf{parasite code}.
 
-The parasite code is a binary blob built as a position independent executable (PIE) for execution inside another process adress space.
-It's purpose is to execute \criu calls from within the dumpee's task address space~\cite{criu-parasite-code}.
+The parasite code is a binary blob built as a position independent executable (PIE) for execution inside another process address space.
+Its purpose is to execute \criu calls from within the dumpee's task address space~\cite{criu-parasite-code}.
 To achieve this goal, \criu must:
 \begin{enumerate}
-    \item Move task into seized state calling \texttt{ptrace(PTRACE\_SEIZE, ...)}. Note that the task is stopped without it noticing, hence not altering it's state.
+    \item Move task into seized state calling \texttt{ptrace(PTRACE\_SEIZE, ...)}. Note that the task is stopped without it noticing, hence not altering its state.
     \item Inject an \texttt{mmap} syscall in the current stack's instruction pointer, and allocate memory for the whole code blob. At this stage, space for exchanging parameters and results is also allocated within the dumpee's process address space. \criu is now ready to run parasite service routines.
     \item The external dumping process retrieves information about the dumpee's address space through the parasite code either through \emph{trap} mode (one command at a time) or \texttt{daemon} mode (in which the parasite behaves as a UNIX socket.
     \item With information about used memory areas and important flags read from \texttt{/proc/\$pid/smaps/} and \texttt{/proc/\$pid/pagemap}, the parasite code transfers the actual content outside through a set of pipes, which in turn gets translated into image files.
 \end{enumerate}
-Lastly, the target process is cured from the parasite by closing it, unmapping it's allocated memory area, and reverting to the original frozen state.
+Lastly, the target process is cured from the parasite by closing it, unmapping its allocated memory area, and reverting to the original frozen state.
 
 \subsubsection*{Restore}
 
@@ -332,7 +332,7 @@ They both focus on high performance, what motivates some of their design choices
 \textbf{DMTCP.}
 
 Distributed Multi-Threaded Checkpointing (DMTCP) is an active project lead by Prof. Cooperman at Northeastern University that implements C/R on a library level.
-This means that if a user wants to checkpoint it's application, this must be dynamically linked from the very beginning and executed with custom wrappers (which decreases transparency).
+This means that if a user wants to checkpoint its application, this must be dynamically linked from the very beginning and executed with custom wrappers (which decreases transparency).
 DMTCP intercepts all system calls instead of assuming existing kernel interfaces, as \criu does, and is, as a consequence, more robust and reliable.
 It is very popular in HPC environments and is present in a variety of publications~\cite{Ansel2009,Garg2019}.
 

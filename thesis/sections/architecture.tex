@@ -1,7 +1,7 @@
 \chapter{Implementing Efficient Live Migration} \label{chap:system}
 
 In this chapter we present our implementation of live migration of \runc containers using \criu.
-In order to achieve efficiency, liveness, and mimick a realistic setting, we explore disk-less and iterative migrations, and checkpointing established TCP connections and external namespaces.
+In order to achieve efficiency, liveness, and mimic a realistic setting, we explore disk-less and iterative migrations, and checkpointing established TCP connections and external namespaces.
 First, in \S\ref{sec:arch-blocks}, we cover the implementation of each of these features in \criu and their integration with \runc.
 Then, we perform a set of microbenchmarks to assess their impact on performance, and finish with a snippet showcasing their usage.
 Lastly, in \S\ref{sec:system}, we provide insights on our final open source implementation available at \url{https://github.com/live-containers/live-migration}.
@@ -426,7 +426,7 @@ We measure from the client side since we are interested in dumping and restoring
 This situation makes more sense from the cloud-provider/load-balancing standpoint.
 
 \textbf{Re-connection after a down period.}
-The first experiment simulates the scenario in which the server is restored some time after the dump occured.
+The first experiment simulates the scenario in which the server is restored some time after the dump occurred.
 In particular, we let the client saturate the link for 10 seconds, then dump the server, and restore it 2 seconds later, all of which transparently to the client (whose connection is never closed).
 In Figure~\ref{fig:evaluation-downtime} we present the throughput perceived by the client as a function of time. 
 \begin{figure}[h!]
@@ -461,7 +461,7 @@ In this section we cover our implementation of live migration of running \runc c
 As previously mentioned, the complete source code is available on Github: \url{https://github.com/live-containers/live-migration}.
 The implementation is fully in \texttt{C} and it amounts to around 1300 LoC.
 We chose \texttt{C} to have a cleaner interaction with the underlying system and a smoother integration with \criu, which is also written in \texttt{C}.
-However, \criu exposes all it's services via an RPC client, hence it should be compatible with a variety of other programming languages.
+However, \criu exposes all its services via an RPC client, hence it should be compatible with a variety of other programming languages.
 Additionally, all the namespace and ip tables handling can be done natively importing the adequate libraries.
 Lastly, \runc is written in \texttt{Go} and we had to interact with it spawning a shell from the main process.
 We would like to eventually try \texttt{crun}, an OCI-compliant runtime written in \texttt{C}, and see whether performance could be improved.
@@ -480,7 +480,7 @@ We have chosen to rely on a single execution process, rather than having a clien
 Hence why we don't need a server process running in the remote machine, but require execution privileges there.
 Second, we assume the required container bundle (\texttt{rootfs} directory and \texttt{config.json} specification file) to be available in the remote end.
 These are required to restore the container.
-Note that this assumption could be easily circunvented pre-generating the bundle before executing the migration.
+Note that this assumption could be easily circumvented pre-generating the bundle before executing the migration.
 The procedure to create a \texttt{rootfs} bundle is very straightforward and we include an example in Listing~\ref{code:runc-bundle}.
 \begin{lstlisting}[style=Bash,caption={Commands to generate an OCI bundle to run a container using \runc.\label{code:runc-bundle}}]
 #!/bin/bash
@@ -500,7 +500,7 @@ Lastly, it is worth mentioning that the support for rootless containers is still
 Therefore, to run the software the user must have \texttt{root} permissions both in both machines (in particular \texttt{CAP\_SYS\_ADMIN}).
 
 We have also implemented two additional modules.
-One performs all the interactions with the remote host such as transfering files, creating directories, and running \criu commands.
+One performs all the interactions with the remote host such as transferring files, creating directories, and running \criu commands.
 In particular, we use \texttt{libssh}~\cite{libssh} to interact with the other node, and implement our methods basing on their low-level primitives.
 The second is a benchmarking module that through conditional compilation adds profiling instructions and generates reports to populate the plots we present throughout this document.
 
@@ -521,7 +521,7 @@ For the remaining of the walkthrough we will assume the default parameters are s
 The most important part in the migration procedure is a loop that periodically and whilst the amount of memory to transfer exceeds a threshold does the following:
 \begin{enumerate}
     \item \textbf{Create Directories.} The first step is to create the local and remote directories where image files will be stored. This has to be done before anything else as otherwise the page server will report an error and crash.
-    \item \textbf{Start Page Server.} As previously introduced, \criu's page server is a one-shot command. This means that once it serves a request it terminates. As a cosnequence at the start of every iteration the command must be re-run. We start it with the following snippet: \texttt{sudo criu page-server -d --images-dir <path> --prev-images-dir <prev-path>} \\\texttt{--port <port>}. Note that the \texttt{prev-images-dir} is crucial to avoid memory duplication.
+    \item \textbf{Start Page Server.} As previously introduced, \criu's page server is a one-shot command. This means that once it serves a request it terminates. As a consequence at the start of every iteration the command must be re-run. We start it with the following snippet: \texttt{sudo criu page-server -d --images-dir <path> --prev-images-dir <prev-path>} \\\texttt{--port <port>}. Note that the \texttt{prev-images-dir} is crucial to avoid memory duplication.
     \item \textbf{Checkpoint.} Now we are ready to checkpoint the container. We use the following command: \texttt{sudo runc checkpoint --pre-dump --image-path <path> --page-server <host>:<port>} \\\texttt{<container\_name>}. Note that the \texttt{--pre-dump} flag is crucial to keep the container running and only dump the contents of the memory, which will be automatically over the network to the page server (and not written to disk).
     \item \textbf{Transfer Remaining Files.} Even though we are only running a \texttt{pre-dump}, there are a few files that need to be transferred to the other node, and we do so at this stage. We additionally perform housekeeping duties cleaning temporary files.
     \item \textbf{Update Directory Counter.} The last step, and not to be overlooked, consists in updating the directory chain that links iterative dumps. In point 2, we need to specify the path to the preceding directory, as a consequence we keep a linked list of directory names.
@@ -574,7 +574,7 @@ while (size_to_xfer > MEMORY_THRESHOLD)
 \end{lstlisting}
 Once we exit the loop, it means the remaining files to transfer are sufficiently small.
 We then proceed to checkpoint and stop the container, transfer the remaining files, and restore it in the other node.
-We persent a simplified version of the code in Listing~\ref{code:last-cp}.
+We present a simplified version of the code in Listing~\ref{code:last-cp}.
 \begin{lstlisting}[language=C,caption={Snippet for the last (stopping) checkpoint and remote restore.\label{code:last-cp}}]
 /* Prepare Environment: create directories and start page server */
 if (prepare_migration(args, 0) != 0)
@@ -632,14 +632,14 @@ if (clean_env(args) != 0)
     return 1;
 }
 \end{lstlisting}
-Note that before exitting we call the \texttt{clean\_env} routine that removes temporary files and cleans the remaining processes.
+Note that before exiting we call the \texttt{clean\_env} routine that removes temporary files and cleans the remaining processes.
 
 \textbf{Networking Module}
 
 From the code snippets presented in the previous lines, the reader might observe a series of calls to some seemingly unfamiliar methods like \texttt{sftp\_copy\_dir} or \texttt{ssh\_remote\_command}.
 One of the first design choices we faced was to whether follow a client-server architecture, in which a listening process would have to be running in advance in the destination machine, or run all commands from the same process.
 We decided to follow the second approach as it required less dependencies on participating nodes (none other than \criu and \runc).
-This decision implied that we would need programatic access from the main execution process to the remote node in order to: manipulate the file system, transfer files, and execute privileged commands.
+This decision implied that we would need programmatic access from the main execution process to the remote node in order to: manipulate the file system, transfer files, and execute privileged commands.
 
 For enhanced control, we decided to implement routines to transfer files and execute remote commands using \texttt{libssh}'s API~\cite{libssh,libssh-api}.
 In particular, we expose the following API calls,
@@ -661,4 +661,4 @@ At the time of the writing the system has only been tested in \texttt{Debian} ma
 When all the dependencies are met, the code can be compiled using \texttt{make all} and executed via \texttt{./migration <container> <host>}.
 This ease of use is not to be overlooked, as similar tools are way more complicated to set up and get running.
 For instance, in order to migrate a process using the old \textsc{P.Haul} interface (\url{https://github.com/checkpoint-restore/p.haul/}), one must set up a NFS mount between source and destination, specify the file descriptors for both RPC and memory socket, and repeat the procedure in both nodes before even starting the script.
-Moreover, the newer interface (\url{https://github.com/checkpoint-restore/go-criu/tree/master/phaul}) does not even allow for standalone excution as it has to be included in a Go project.
+Moreover, the newer interface (\url{https://github.com/checkpoint-restore/go-criu/tree/master/phaul}) does not even allow for standalone execution as it has to be included in a Go project.
