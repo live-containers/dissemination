@@ -5,21 +5,21 @@ In this chapter, we move on to evaluate the system as a whole, and how the diffe
 
 In all the experiments here presented, and unless otherwise stated, we use the same experimental setup than in the micro-benchmark chapter.
 Two (if necessary) Linux Debian machines with kernel version $4.19.0-6$ running on a host-only network in VirtualBox version $5.2.34$.
-\criu version $3.13$ and \runc version $1.0.0-rc8$, both built from source.
+\criu version $3.13$ and \runc version \texttt{1.0.0-rc8}, both built from source.
 
 \section{Application Downtime}
 
-In this section we study the impact of the threshold value we set to stop the iterative migration and dump the application in the total downtime.
+In this section we study the impact of the threshold value we set to stop the iterative migration and dump the application on the total downtime.
 As previously introduced in the \textit{Iterative Migration} section from \S\ref{sec:arch-blocks}, we establish an arbitrary parameter to decide when to stop transferring only memory dumps (\textit{i.e.} pre-dumping the container process) and checkpoint, hence freeze, and migrate the application to the remote host.
 A reasonable rule of thumb is to establish a memory cap, and whenever the successive dumps are smaller than said cap, trigger the threshold and exit the loop.
-However, a hard-coded value would be very ad-hoc to our experimental setup.
+However, a hard-coded value would be very \textit{ad-hoc} to our experimental setup.
 Therefore, we have benchmarked the impact of setting a variable memory cap to the total downtime.
 The values we choose are proportional to the size of the initial allocated memory pool.
 
 In order to test this feature we set up the following experiment.
-We deploy an in-memory \textsc{Redis} database with 1e6 keypairs which result in an allocated memory (for all the container) of several hundreds of MB.
+We deploy an in-memory \textsc{Redis} database with $1e6$ key pairs which result in an allocated memory (for all the container) of several hundreds of MB.
 We use \texttt{redis-client} and \texttt{redis-server} version $5.0.3$.
-For each run, we set a percentage of the initial memory as our threshold value, and report the total application downtime and a breakdown of the time spent (in percentage) during the last dump of each iteration.
+For each run, we set a percentage of the initial memory as our threshold value, and report the total application downtime and a breakdown of the time spent (in percentage) during the last dump of each migration to the remote host.
 In particular we measure the time spent dumping the memory (\texttt{dump}), preparing the migration (\texttt{prepare}), transferring files to the other host (\texttt{transfer}) and during restore (\texttt{restore}).
 We present our results in Figure~\ref{fig:downtime}.
 
