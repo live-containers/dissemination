@@ -7,7 +7,7 @@ In all the experiments here presented, and unless otherwise stated, we use the s
 Two (if necessary) Linux Debian machines with kernel version $4.19.0-6$ running on a host-only network in VirtualBox version $5.2.34$.
 \criu version $3.13$ and \runc version \texttt{1.0.0-rc8}, both built from source.
 
-\section{Application Downtime}
+\section{Application Downtime} \label{sec:eval-downtime}
 
 In this section we study the impact of the threshold value we set to stop the iterative migration and dump the application on the total downtime.
 As previously introduced in the \textit{Iterative Migration} section from \S\ref{sec:arch-blocks}, we establish an arbitrary parameter to decide when to stop transferring only memory dumps (\textit{i.e.} pre-dumping the container process) and checkpoint, hence freeze, and migrate the application to the remote host.
@@ -33,7 +33,7 @@ We observe that, for our particular setting, once the memory cap reaches $10\%$ 
 Moreover it is also interesting to see that, as this value gets closer to the baseline, the time spent (absolute and relative) dumping memory decreases.
 This results are specific to our setting with two virtual machines and limited memory, but a similar benchmark could be reproduced in production to estimate an adequate threshold value.
 
-\section{Memory Scalability}
+\section{Memory Scalability} \label{sec:eval-memory}
 
 In this section we study the scalability of our approach with respect to the memory allocated by the to-be checkpointed container.
 For this experiment we set up a \textsc{Redis} in-memory database which we pre-load with a variable number of key-value pairs.

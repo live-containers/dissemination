@@ -3,7 +3,7 @@
 In this chapter we introduce the most relevant pieces of related work we have based our work on, together with similar approaches to tackle live migration of processes or containers.
 We also include, given the educational nature of this work, references on the bibliography we have based our claims on, together with the materials used throughout our learning process as we understand it is relevant in the frame of a Master's thesis.
 
-\section{Containers: Overview, Internals, and Terminology}
+\section{Containers: Overview, Internals, and Terminology} \label{sec:rw-cont}
 
 The main goal of this work is to perform efficient live migration of running containers.
 As a consequence, understanding the working principles of the latter is of prominent importance.
@@ -31,7 +31,7 @@ In this article, Hykes introduces what exactly is \runc, the motivation behind i
 The project is very active on Github~\cite{runc-memtrack}, and the different issues there posted together with the available documentation (from the repository itself) are the best source of information for the project.
 Lastly, \runc is on track  with the OCI container runtime specification, which is also available on GitHub~\cite{runc-spec}.
 
-\section{Checkpoint Restore and \criu}
+\section{Checkpoint Restore and \criu} \label{sec:rw-criu}
 
 Checkpoint-Restore being a technique (application checkpointing) rather than a tool, makes the topic that much vague for it's research.
 A good starting point is the definition in the Encyclopedia of Parallel Computing~\cite{Schulz2011}.
@@ -67,7 +67,7 @@ A stretch goal for this project was to implement live migration of distributed c
 Even though we have not had time to address the implementation of such a concept, we have used several well-established resources for documentation purposes.
 We would like to highlight the works by Raynal~\cite{Raynal2013} and Kshemkalyani~\cite{Kshemkalyani2008}.
 
-\section{Applications of C/R and Live Migration}
+\section{Applications of C/R and Live Migration} \label{sec:rw-app}
 
 Even thoguh C/R and live migration are a relatively mature topic of research, scientific contributions covering particular applications are way more scarce.
 This was, among others, one of our initial motivations for this work.
