@@ -1,9 +1,54 @@
 \chapter{Conclusions and Future Work} \label{chap:conclusion}
 
-Lessons learnt?
+In this Chapter we summarize the work presented, and critically assess whether our contributions match the objectives we initially planned.
+We also provide an objective overview of the results presented in order to establish if the techniques we use are ready for a production environment.
+Bear in mind that checkpoint-restore as a load-balancing tool is still a very novel technique, and even more in the context of containerized applications.
+Lastly, in \S\ref{sec:conc-fw} we cover the stones we left unturned, the things we would have liked to include in this thesis but have not been able to, and the research lines we believe this initial approach heads us to.
 
-Future Work
+\section{Conclusions and Lessons Learnt}
 
-- Live migration of multiple containers at once.
+Our initial goal was to implement a tool for efficient live migration of containers.
+It was surprising to us that, such an apparently useful technique (checkpointing of containers), had been abandoned for several years in \textsc{Docker}'s \texttt{experimental} branch.
+Even though the reasons for this are still unclear to us, what has become apparent is that migrating a container is not an easy task.
+\criu is an incredibly complex tool, with a very helpful community, but whose intricate relation with the kernel makes it hard to debug whenever things don't go as expected.
+Luckily, the integration with other container engines (other than \textsc{Docker}), is way more maintained, resourceful, documented, and tested.
+These other container engines target a different audience than \textsc{Docker} does, and hence why the feature is not mainline in the latter.
 
-- Comparison with other live migration tools such as those provided by LXC and KVM and P.Haul
+Live migration turned out not to be only checkpointing, transferring files, and restoring from another node.
+At least not if we were looking for performance even in the event of resource-intensive containers with established TCP connections and external namespaces.
+The process of optimizing (less resource usage), reducing downtime, and integrating further capabilities, was done by micro benchmarking each different feature to motivate our design choices as presented in~\S\ref{sec:arch-blocks}.
+It has lead us to use, by default, iterative, diskless migration with a special handling of namespaces and IP tables filtering in the event of existing connections.
+And to our ultimate goal of a single binary file that, given a container name and a target IP, migrates efficiently said container.
+The current implementation can be downloaded and tested from \url{https://github.com/live-containers/live-migration}.
+
+Our experimental results presented in Chapter~\ref{chap:evaluation}, validate our design.
+Firstly, resource utilization, and in particular disk usage and memory duplication, is drastically reduced when compared to a naive migration approach.
+Secondly, scalability with the size of the allocated memory is better than both naive migration and VM migration, whilst maintaining a baseline of approximately $0.2-0.3$ seconds (bear in mint that this time takes dump, restore, and network transfer and latency into account).
+Thirdly, the throughput in downtime perceived by a network-intensive client when migrating the server to the same location (\textit{i.e.} simulating a maintenance reboot) was under $0.1$ seconds when flooding the link.
+We therefore conclude that this would be close to negligible for a regular client.
+Lastly, we provide a procedure and benchmarking technique to estimate a threshold value necessary for iterative migration.
+
+As a consequence, we believe that the techniques we have used and the work here presented are mature enough to be used, at least, in replacement of traditional virtual machine migration.
+We are also confident that migration of containers, their native support within engines and orchestrators, and their integration with larger frameworks, will see a drastic increase in the coming years.
+
+\section{Future Work} \label{sec:conc-fw}
+
+Unfortunately, and as it tends to be the case, there has been much work we would have liked to include in the present work but we have not been able to.
+Either due to a lack of time or a lack of expertise and experience, there are some areas of this research that we would like to polish, and some ones which we would like to push forward in the future.
+
+From a technical standpoint, there are some implementation and evaluation details we would like to polish.
+Firstly, as mentioned in \S\ref{sec:system}, there are some assumptions we make on both source and destination hosts.
+With regard to the authentication of the user in the remote host, we have found no shortcoming.
+Even if we were to use a client-server architecture, the listening counterpart would also need to run in privileged mode.
+Support for rootless containers and rootless restore in \criu is not available~\cite{criu-rootless1,criu-rootless2}, so our pre-requisites in this regard are necessary and sufficient.
+As for the pre-provisioning of the OCI bundle to start a \runc container and the image transfer optimization, the former could be easily scripted, and the latter is an active open research topic~\cite{criu-image-streamer} in \criu, which we could leverage in the near future.
+Secondly, we would like to perform further benchmarking against other live migration tools.
+In particular, we were unable to compare against \textsc{P.Haul} due to the project not being actively maintained (as an executable) and only distributed as a library.
+With some additional time we could indeed compare both solutions, together with other VM migration tools (other than VirtualBox's) like those offered by LXC and KVM.
+We believe that with these additional contributions, a trimmed version of the material here presented is suitable to be submitted to a dedicated conference, and we plan to do so throughout the coming months.
+
+On a broader scope, the over-arching goal of this project was to support live migration for distributed container deployments.
+We believe the work here presented is a necessary first step towards achieving it, but there's still much work to be done.
+From an algorithmic standpoint, distributed checkpointing and coordination algorithms need to be implemented.
+From an infrastructure standpoint, distributed container deployments are managed through an orchestrator.
+The integration of \criu with such a tool is, to the best of our knowledge, unexplored territory and something we look forward to doing in the future.
