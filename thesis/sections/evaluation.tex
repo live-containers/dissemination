@@ -78,9 +78,6 @@ Lastly, we also observe that a user will specially benefit from using a speciali
 In this second comparison, we compare against traditional virtual machine migration.
 Given that our test nodes were already running in VirtualBox version $5.2.3$, we have opted to use VirtualBox's native live migration solution: teleporting~\cite{vbox-teleport}.
 From the user manual we read that teleporting boils down to moving one virtual machine from one VirtualBox host to another one over TCP/IP.
-In our particular experiment, the VirtualBox  host would be the same, as we are migrating to \texttt{localhost}, but to a different virtual machine (a pre-made clone of the origin one).
-In Listing~\ref{code:vm-teleport} we include the evaluation snippet we used to launch the experiments and teleport the machines.
-Note that some additional commands had to be made through the GUI, and that the \texttt{./run\_redis.sh} script is very similar to the one presented in Listing~\ref{code:redis-bulk-upload}.
 
 \begin{lstlisting}[style=Bash,caption={Script to teleport a VirtualBox VM, and run the macrobenchmark.},label={code:vm-teleport}]
 #!/bin/bash
@@ -104,6 +101,16 @@ do
 done
 \end{lstlisting}
 
+In our particular experiment, the VirtualBox  host would be the same, as we are migrating to \texttt{localhost}, but to a different virtual machine (a pre-made clone of the origin one).
+In Listing~\ref{code:vm-teleport} we include the evaluation snippet we used to launch the experiments and teleport the machines.
+Note that some additional commands had to be made through the GUI, and that the \texttt{./run\_redis.sh} script is very similar to the one presented in Listing~\ref{code:redis-bulk-upload}.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figs/vm-teleport/vm_teleport.pdf}
+    \caption[Scalability comparison with VirtualBox Teleport.]{Scalability with respect to the memory to transfer. We compare our system with VM live migration using VirtualBox's Teleport functionality.\label{fig:vm-teleport}}
+\end{figure}
+
 We present our results in Figure~\ref{fig:vm-teleport}.
 The first observation we can make, is that VM live migration has a significantly higher overhead in the baseline case.
 This was to be expected as overall overhead and slow boot times are the main argument in favour of containers and against virtual machines.
@@ -112,8 +119,3 @@ However, what is also worth noticing is the scalability.
 Whilst our system (for which we re-plot the same results from Figure~\ref{fig:key-scalability}), experiences an increase in downtime of $\times 1.5$, VirtualBox's experiences a downtime closer to $\times 2$ (whilst naive migration had one closer to $\times 10$).
 This result shows that, even with a drastically smaller overhead, our system also showcases a better scalability when compared to traditional VM migration.
 
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=\textwidth]{figs/vm-teleport/vm_teleport.pdf}
-    \caption[Scalability comparison with VirtualBox Teleport.]{Scalability with respect to the memory to transfer. We compare our system with VM live migration using VirtualBox's Teleport functionality.\label{fig:vm-teleport}}
-\end{figure}

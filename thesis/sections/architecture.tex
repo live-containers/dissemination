@@ -384,7 +384,7 @@ cd `CWD`) &
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Excerpt of a script to checkpoint a connection within an existing namespace, and inherit it on restore.\label{code:microbenchmark-tcp-netns}}]
+\begin{lstlisting}[style=Bash,caption={Excerpt of a script to checkpoint a connection within an existing namespace.\label{code:microbenchmark-tcp-netns}}]
 #!/bin/bash
 # Two namespaces with path NS_1 and NS_2
 INO_1=$(ls -iL ${NS_1} | awk '{ print $1 }')
@@ -432,7 +432,7 @@ In Figure~\ref{fig:evaluation-downtime} we present the throughput perceived by t
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\linewidth]{./figs/tcp-established-downtime/tcp_established_downtime_microbenchmark.pdf}
-    \caption{Throughput perceived from the client as a function of time, when we checkpoint the server once, and restore it after two seconds. We compare the results of \criu and \runc. \label{fig:evaluation-downtime}}
+    \caption[Throughput over time after a long off period]{Throughput perceived from the client as a function of time, when we checkpoint the server once, and restore it after two seconds. We compare the results of \criu and \runc. \label{fig:evaluation-downtime}}
 \end{figure}
 The first observation we make from the plot, is that it takes almost a full second to get the connection back to full speed.
 To understand this behaviour we must recall what is \texttt{iPerf3} actually doing.
@@ -448,7 +448,7 @@ We again present the throughput as a function of time in Figure~\ref{fig:evaluat
 \begin{figure}[h!]
     \centering
     \includegraphics[width=\linewidth]{./figs/tcp-established-resolution/tcp_established_resolution_microbenchmark.pdf}
-    \caption{Throughput from the client as a function of time.\label{fig:evaluation-reactivity}}
+    \caption[Throughput over time and reactivity to sudden C/R.]{Throughput from the client as a function of time as we iteratively checkpoint and restore the service immediately after.\label{fig:evaluation-reactivity}}
 \end{figure}
 In this case the measured throughput downtime does not exceed $0.1$ seconds, an order of magnitude better than the previous experiment.
 This reduced value, together with the fact that the application studied is very network-intensive, makes us believe that our proposed technique is suitable for most client-server scenarios and won't have an impact in the overall quality of service.

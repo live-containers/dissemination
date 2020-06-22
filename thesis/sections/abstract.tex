@@ -1,7 +1,7 @@
 %% ENGLISH VERSION ------------------------------------------------------------
 \addcontentsline{toc}{chapter}{Abstract}
 \topskip0pt
-\vspace*{2.00cm}
+\vspace*{1.50cm}
 \begin{center}
 
     \LARGE
@@ -18,18 +18,33 @@
 \vspace{0.5cm}
 
 \normalsize
-To be filled
+Containers have become the go-to technology for managing application's lifecycle in the cloud.
+As a consequence, cloud-tenants are becoming increasingly interested in advanced load-balancing strategies to optimize resource usage and guarantee good quality of service.
+Live migration is a technique to halt the execution of a program and resume it in the same state in a different location.
+It relies on checkpoint-restore tools to snapshot an application's state.
+Checkpoint-Restore in Userspace (CRIU) is one of such tools, designed to work transparently to the user, entirely from userspace, and specialized for containers.
+
+In this Master thesis we present a tool to perform live migration of \runc containers using \criu.
+Our solution is efficient in terms of resource utilization, memory and disk, and minimizes downtime when compared to naive migration through checkpoint-transfer-restore and native virtual machine (VM) migration.
+We also provide support to checkpoint memory and network intensive containers with established TCP connections and external namespaces.
+The implementation is accompanied by a thorough background research, together with a set of micro benchmarks to justify each of our design choices.
+It is open sourced and available in the project's repository.
+
+Our evaluation results show that, by adding a very small overhead ($0.1$s to the baseline of checkpoint-transfer-restore) we improve scalability with regard to allocated memory by a factor of 10.
+Additionally, all our results are an order of magnitude faster than traditional virtual machine migration.
+Lastly, our benchmarking of network intensive server-side application's migration reported a $< 0.1$s throughput downtime, negligible with more moderate workloads.
+As a consequence, we believe our migration technique for \criu and \runc is a feasible replacement for VM migration and, as the technology matures, will be ready for deployment in production.
 
 \vspace{0.5cm}
 
-\textbf{Keywords:} 
+\textbf{Keywords:} checkpoint, restore, live migration, CRIU, runc, container, load-balancing
 
 \vfill
 \pagebreak
 
 %% CATALAN VERSION ------------------------------------------------------------
 \topskip0pt
-\vspace*{2cm}
+\vspace*{1.5cm}
 \begin{center}
     \LARGE
     \textit{\textbf{Resum}} 
@@ -46,10 +61,25 @@ To be filled
 
 \normalsize
 
-Per omplir...
+Els contenidors de programari han esdevingut la tecnologia referent per gestionar aplicacions al n\'uvol.
+Com a conseq\"u\`encia, els principals prove\"idors de servei estan cada vegada m\'es interessats en solucions per gestionar dits contenidors, i oferir garanties de qualitat als seus usuaris.
+La migraci\'o d'aplicacions consisteix en aturar un proc\'es i reiniciar-lo a un altre entorn d'execuci\'o en el mateix punt en el que s'havia aturat.
+Es basa en la capacitat de generar captures de l'estat d'execuci\'o d'un proc\'es.
+\textit{Checkpoint-Restore in Userspace (CRIU)} \'es un projecte de codi obert que permet obtenir dites captures de manera transparent a l'usuari, sense modificar-ne el kernel, i especialitzada en contenidors.
+
+En aquesta t\`esis de M\`aster, presentem una eina per realitzar migracions de contenidors tipus \runc emprant \criu.
+La nostre soluci\'o \'es eficient en termes d'utilitzaci\'o de recursos, mem\`oria i disc, i minimitza el temps de migraci\'o quan comparada amb una migraci\'o basada en capturar-transferir-reiniciar i amb la migraci\'o nativa de m\`aquines virtuals oferida pels seus prove\"idors.
+En afegit, la nostra eina permet migrar aplicacions que fan \'us intensiu tant de mem\`oria com de xarxa, amb connexions TCP establertes, i \textit{namespaces} externs.
+La implementaci\'o est\`a acompanyada d'una recerca bibliogr\`afica en profunditat, aix\'i com d'una s\`erie d'experiments que motiven els nostres criteris de disseny.
+El codi \'es de lliure acc\'es i es pot trobar a la p\`agina web del projecte.
+
+Els nostres resultats mostren que, afegint una petita redund\`ancia ($0.1$s al temps de refer\`encia de capturar-transferir-reiniciar) millorem l'escalabilitat del sistema en termes d'utilitzaci\'o de mem\`oria en un factor 10.
+En afegit, tots els nostres resultats s\'on un ordre de magnitud m\'es r\`apids que les migracions tradicionals de m\`aquines virtuals.
+Per \'ultim, els nostres experiments amb aplicacions que fan \'us intensiu de xarxa mostren una caiguda del servei inferior als $0.1$ segons, imperceptible per clients amb c\`arregues de treball m\'es moderades.
+A mode de conclusi\'o, creiem que la t\`ecnica de migraci\'o que proposem en aquest projecte per \criu i \runc \'es una alternativa viable a la migraci\'o de m\`aquines virtuals i, a mesura que la tecnologia maduri, estar\`a llesta per entorns de producci\'o.
 
 \vspace{0.5cm}
 
-\textbf{Paraules Clau:} 
+\textbf{Paraules Clau:} migracio, contenidor, CRIU, runc, captura d'estats, \textit{checkpoint}
 
 \vfill

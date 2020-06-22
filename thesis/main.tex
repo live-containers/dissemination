@@ -2,6 +2,7 @@
 
 % Document Preamble: basic definitions and packages.
 \input{sections/preamble.tex}
+\usepackage{pdfpages}
 
 % List of acronyms
 \makeglossaries
@@ -12,6 +13,10 @@
 
 \frontmatter
 \pagestyle{frontmatter}
+
+% MAMME mandatory cover
+\includepdf[noautoscale=true, width=\paperwidth]{MAMME_Cover.pdf}
+\newpage
 
 % Title page
 \input{sections/front-page.tex}
