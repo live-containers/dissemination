@@ -12,7 +12,7 @@ It was surprising to us that, such an apparently useful technique (checkpointing
 Even though the reasons for this are still unclear to us, what has become apparent is that migrating a container is not an easy task.
 \criu is an incredibly complex tool, with a very helpful community, but whose intricate relation with the kernel makes it hard to debug whenever things don't go as expected.
 Luckily, the integration with other container engines (other than \textsc{Docker}), is way more maintained, resourceful, documented, and tested.
-These other container engines target a different audience than \textsc{Docker} does, and hence why the feature is not mainline in the latter.
+These other container engines target a different audience than \textsc{Docker} does, and hence why the feature may not be mainline in the latter.
 
 Live migration turned out not to be only checkpointing, transferring files, and restoring from another node.
 At least not if we were looking for performance even in the event of resource-intensive containers with established TCP connections and external namespaces.
@@ -36,7 +36,7 @@ We are also confident that migration of containers, their native support within 
 Unfortunately, and as it tends to be the case, there has been much work we would have liked to include in the present work but we have not been able to.
 Either due to a lack of time or a lack of expertise and experience, there are some areas of this research that we would like to polish, and some ones which we would like to push forward in the future.
 
-From a technical standpoint, there are some implementation and evaluation details we would like to polish.
+From a technical standpoint, there are some implementation and evaluation details we would like to complete.
 Firstly, as mentioned in \S\ref{sec:system}, there are some assumptions we make on both source and destination hosts.
 With regard to the authentication of the user in the remote host, we have found no shortcoming.
 Even if we were to use a client-server architecture, the listening counterpart would also need to run in privileged mode.
