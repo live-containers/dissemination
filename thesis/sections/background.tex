@@ -71,7 +71,7 @@ These operations require the \texttt{CAP\_SYS\_ADMIN} capability.
 In Listings~\ref{code:namespaces-unshare} and~\ref{code:namespaces-setns} we include examples of usage of \texttt{unshare} and \texttt{setns} respectively.
 \begin{figure}[h!]
     \begin{minipage}{.45\textwidth}
-        \begin{lstlisting}[language=C,caption={Snippet to unshare the calling thread from a namespace using \texttt{unshare}.\label{code:namespaces-unshare}}]
+        \begin{lstlisting}[language=C,caption={Snippet to unshare the calling thread from a namespace using \texttt{unshare}.},label={code:namespaces-unshare}]
 #define _GNU_SOURCE
 #include <errno.h>
 #include <sched.h>
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 \end{lstlisting}
     \end{minipage} \hfill
     \begin{minipage}{.45\textwidth}
-        \begin{lstlisting}[language=C,caption={Snippet to attach to an existing network namespace.\label{code:namespaces-setns}}]
+        \begin{lstlisting}[language=C,caption={Snippet to attach to an existing network namespace.},label={code:namespaces-setns}]
 #define _GNU_SOURCE
 #include <errno.h>
 #include <sched.h>

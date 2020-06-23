@@ -4,8 +4,8 @@ In the previous chapter, \S\ref{chap:system}, we have presented our implementati
 In this chapter, we move on to evaluate the system as a whole, and how the different features interlace and work together, and  how does our system compare to traditional virtual machine live migration.
 
 In all the experiments here presented, and unless otherwise stated, we use the same experimental setup than in the micro-benchmark chapter.
-Two (if necessary) Linux Debian machines with kernel version $4.19.0-6$ running on a host-only network in VirtualBox version $5.2.34$.
-\criu version $3.13$ and \runc version \texttt{1.0.0-rc8}, both built from source.
+Two (if necessary) Linux Debian machines with kernel version \texttt{4.19.0-6} running on a host-only network in VirtualBox version \texttt{5.2.34}.
+\criu version \texttt{3.13} and \runc version \texttt{1.0.0-rc8}, both built from source.
 
 \section{Application Downtime} \label{sec:eval-downtime}
 
@@ -33,11 +33,11 @@ We observe that, for our particular setting, once the memory cap reaches $10\%$ 
 Moreover it is also interesting to see that, as this value gets closer to the baseline, the time spent (absolute and relative) dumping memory decreases.
 This results are specific to our setting with two virtual machines and limited memory, but a similar benchmark could be reproduced in production to estimate an adequate threshold value.
 
-\section{Scalability with the Container's Memory Size} \label{sec:eval-memory}
+\section{Scalability regarding the Container's Memory Size} \label{sec:eval-memory}
 
 In this section we study the scalability of our approach with respect to the memory allocated by the to-be checkpointed container.
 For this experiment we set up a \textsc{Redis} in-memory database which we pre-load with a variable number of key-value pairs.
-We use, similarly to the previous section, \texttt{redis-client} and \texttt{redis-server} version $5.0.3$, and pre-load the keys using the \texttt{--pipe} flag for bulk data upload.
+We use, similarly to the previous section, \texttt{redis-client} and \texttt{redis-server} version \texttt{5.0.3}, and pre-load the keys using the \texttt{--pipe} flag for bulk data upload.
 In Listing~\ref{code:redis-bulk-upload} we include the script for doing so.
 Note that this same strategy was also used in other benchmarks using \textsc{Redis}.
 \begin{lstlisting}[style=Bash,caption={Snippet for bulk data upload to a Redis database.},label={code:redis-bulk-upload}]
@@ -54,8 +54,8 @@ cat "./data/file.dat" | redis-cli -h `< .ip` --pipe
 Our goal is to evaluate the impact of the size of the memory allocated to the overall container downtime.
 In order to compare against a naive live migration (checkpoint, transfer files, and restore on the remote end) and traditional virtual machine migrations, we choose not to use iterative migration in our system.
 This is due to the fact that it would be an unfair advantage against the other two systems.
-Additionally, and in order to avoid noise introduced by the network latency, we run migrations locally (\textit{i.e.} transferring files to $127.0.0.1$).
-We measure the application's downtime (time to checkpoint plus time to restore) when running an in-memory \textsc{Redis} database pre-loaded with key-value pairs of sizes raging $16 B$ for one pair to $265 MB$ for $1e7$ pairs.
+Additionally, and in order to avoid noise introduced by the network latency, we run migrations locally (\textit{i.e.} transferring files to \texttt{127.0.0.1}).
+We measure the application's downtime (time to checkpoint plus time to restore) when running an in-memory \textsc{Redis} database pre-loaded with key-value pairs of sizes raging $16$ B for one pair to $265$ MB for $1e7$ pairs.
 
 \textbf{Comparison Against Naive Live Migration.}
 
@@ -76,10 +76,10 @@ Lastly, we also observe that a user will specially benefit from using a speciali
 \textbf{Comparison Against Virtual Machine Migration}
 
 In this second comparison, we compare against traditional virtual machine migration.
-Given that our test nodes were already running in VirtualBox version $5.2.3$, we have opted to use VirtualBox's native live migration solution: teleporting~\cite{vbox-teleport}.
+Given that our test nodes were already running in VirtualBox version \texttt{5.2.3}, we have opted to use VirtualBox's native live migration solution: teleporting~\cite{vbox-teleport}.
 From the user manual we read that teleporting boils down to moving one virtual machine from one VirtualBox host to another one over TCP/IP.
 
-\begin{lstlisting}[style=Bash,caption={Script to teleport a VirtualBox VM, and run the macrobenchmark.},label={code:vm-teleport}]
+\begin{lstlisting}[style=Bash,caption={Script to teleport a VirtualBox VM, and run the macro-benchmark.},label={code:vm-teleport}]
 #!/bin/bash
 
 # Configure target machine to wait for a teleport request to arrive
@@ -120,7 +120,7 @@ Whilst our system (for which we re-plot the same results from Figure~\ref{fig:ke
 This result shows that, even with a drastically smaller overhead, our system also showcases a better scalability when compared to traditional VM migration.
 
 The improvements from our library with respect to naive and VM migration can be understood from the following facts.
-When compared to native migration, our system does not rely on files written to disk, neither duplicates memory allocation.
+When compared to naive migration, our system does not rely on files written to disk, neither duplicates memory allocation.
 This adds a small overhead to the baseline, but drastically improves scalability.
 When compared to VM migration, the difference in baselines comes from the way larger set of files VirtualBox has to copy in order to restore the machine.
 Furthermore, the slight gains in scalability probably come from the completely diskless migration we employ.

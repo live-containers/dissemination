@@ -468,7 +468,7 @@ int sftp_copy_dir(ssh_session session, char *dst_path, char *src_path,
 
 \chapter{Evaluation Code Snippets} \label{chap:app:evaluation}
 
-\begin{lstlisting}[style=Bash,caption={Full evaluation script for the diskless migration micro-benchmark using. \label{code:microbenchmark-diskless-evaluation}}]
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the diskless migration micro-benchmark using.},label={code:microbenchmark-diskless-evaluation}]
 #!/bin/bash
 HOME=$(pwd)
 #IP=127.0.0.1
@@ -506,7 +506,7 @@ echo "Average: $avg"
 echo "Std: $std"
 \end{lstlisting}
 
-\begin{lstlisting}[style=Bash,caption={Full evaluation script for the iterative migration micro-benchmark.\label{code:microbenchmark-iterative-evaluation}}]
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the iterative migration micro-benchmark.},label={code:microbenchmark-iterative-evaluation}]
 #!/bin/bash
 # Run Process
 # Redis Test (Pre-loading omitted)
@@ -546,7 +546,7 @@ D3=$(ls -lah ./images/3/pages-1.img | awk '{ print $5; }')
 echo "Test finished: -D1: $D1 -D2: $D2 -D3: $D3"
 \end{lstlisting}
 
-\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection downtime microbenchmark using \criu.\label{code:microbenchmark-tcp-criu-downtime}}]
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection downtime microbenchmark using \criu.},label={code:microbenchmark-tcp-criu-downtime}]
 #!/bin/bash
 # Declare Variables
 CLIENT_IP=192.168.56.103
@@ -591,7 +591,7 @@ sudo criu restore \
     --tcp-established
 \end{lstlisting}
 
-\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection reactivity microbenchmark using \criu.\label{code:microbenchmark-tcp-criu-reactivity}}]
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection reactivity microbenchmark using \criu.},label={code:microbenchmark-tcp-criu-reactivity}]
 #!/bin/bash
 # Declare Variables
 CLIENT_IP=192.168.56.103
@@ -658,7 +658,7 @@ sudo criu restore \
     --tcp-established)
 \end{lstlisting}
 
-\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection downtime microbenchmark using \runc.\label{code:microbenchmark-tcp-runc-downtime}}]
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection downtime microbenchmark using \runc.},label={code:microbenchmark-tcp-runc-downtime}]
 #!/bin/bash
 # Declare Variables
 CLIENT_IP=192.168.56.103
@@ -702,7 +702,7 @@ sudo runc restore \
 cd ${CWD}
 \end{lstlisting}
 
-\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection reactivity microbenchmark using \runc.\label{code:microbenchmark-tcp-runc-reactivity}}]
+\begin{lstlisting}[style=Bash,caption={Full evaluation script for the tcp connection reactivity microbenchmark using \runc.},label={code:microbenchmark-tcp-runc-reactivity}]
 #!/bin/bash
 # Declare Variables
 CLIENT_IP=192.168.56.103

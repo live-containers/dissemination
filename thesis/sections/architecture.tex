@@ -3,7 +3,7 @@
 In this chapter we present our implementation of live migration of \runc containers using \criu.
 In order to achieve efficiency, liveness, and mimic a realistic setting, we explore disk-less and iterative migrations, and checkpointing established TCP connections and external namespaces.
 First, in \S\ref{sec:arch-blocks}, we cover the implementation of each of these features in \criu and their integration with \runc.
-Then, we perform a set of microbenchmarks to assess their impact on performance, and finish with a snippet showcasing their usage.
+Then, we perform a set of micro-benchmarks to assess their impact on performance, and finish with a snippet showcasing their usage.
 Lastly, in \S\ref{sec:system}, we provide insights on our final open source implementation available at \url{https://github.com/live-containers/live-migration}.
 
 \section{Building Blocks} \label{sec:arch-blocks}
@@ -20,7 +20,7 @@ Unless otherwise stated, we run each one in a Debian machine with kernel version
 
 As previously detailed, \criu builds the snapshot of a running process using image (\texttt{.img}) files, which are stored in a user-specified path.
 As a consequence, it relies heavily on the underlying storage facility provided which, in most commodity PCs, tends to be the disk-backed file system.
-It is of no surprise then, that reading and writing from and to disk can quickly become the bottleneck in live migration performance.
+It is of no surprise then, that reading and writing from and to disk can quickly become the bottleneck in live migration's performance.
 It gets even worse when writes are duplicated, \textit{i.e.} we write once to disk to dump the process state, and a second time to transfer image files wherever they need to be restored.
 To overcome the former, we rely on \texttt{tmpfs} a virtual memory file system~\cite{tmpfs-manpage}.
 For the latter, we leverage \criu's \texttt{page-server}.
@@ -57,7 +57,7 @@ The former is in another level of abstraction than \runc, and for the latter we 
 In Listings~\ref{code:microbenchmark-diskless-runc} and~\ref{code:microbenchmark-diskless-criu} we include snippets to perform a checkpoint with a page server using \runc and \criu respectively.
 \begin{figure}[h!]
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \runc using a page server.\label{code:microbenchmark-diskless-runc}}]
+    \begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \runc using a page server.},label={code:microbenchmark-diskless-runc}]
 #!/bin/bash
 # Start the Page Server
 sudo criu page-server \
@@ -79,7 +79,7 @@ cp /path/to/src/images/* \
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \criu using a page server.\label{code:microbenchmark-diskless-criu}}]
+    \begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \criu using a page server.},label={code:microbenchmark-diskless-criu}]
 #!/bin/bash
 # Start the Page Server
 sudo criu page-server \
@@ -165,11 +165,11 @@ Upon restore, links among successive dumps are pieced together to successfully r
 The integration with \runc is seamless.
 The pre-dump functionality is triggered with the \texttt{--pre-dump} flag which, in turn, sets the memory tracking flag automatically~\cite{runc-memtrack}.
 Lastly, the \texttt{--parent-path} flag can be used to achieve the correct linkage between dumps.
-In Listings \ref{code:microbenchmark-iterative-criu} and \ref{code:microbenchmark-iterative-runc} we include the different scripts to perform the three consecutive dumps both in \criu and \runc.
+In Listings~\ref{code:microbenchmark-iterative-runc} and~\ref{code:microbenchmark-iterative-criu} we include the different scripts to perform the three consecutive dumps both in \criu and \runc.
 The complete scripts used for the benchmarking are included in Listing \ref{code:microbenchmark-iterative-evaluation}.
 \begin{figure}[h!]
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running process using CRIU.\label{code:microbenchmark-iterative-runc}}]
+    \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running process using \criu.},label={code:microbenchmark-iterative-runc}]
 #!/bin/bash
 # First Pre-Dump
 sudo runc checkpoint \
@@ -198,7 +198,7 @@ sudo runc checkpoint \
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running container using runC.\label{code:microbenchmark-iterative-criu}}]
+    \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running container using \runc.},label={code:microbenchmark-iterative-criu}]
 #!/bin/bash
 # First Pre-Dump
 sudo criu pre-dump \
@@ -248,7 +248,7 @@ In the counter case, the initial dump is around 90 kB and subsequent ones are 12
 Once we modify the memory, additional pages need to be transferred.
 In the counter case, between successive dumps we just increase the value of a variable and alter the state of \texttt{stdout}, what translates in a 10 kB increase in the image size every time.
 In the \redis one, the \texttt{redis-benchmark} is non-deterministic in nature, but it's worth observing how shuffling a percent of the total key-store propagates to higher percentages of memory re-use.
-We conclude that memory tracking is a necessary feature if any application considers even near-live migration of production applications, and the technology presented allows for an easy way to do-so.
+We conclude that memory tracking is a necessary feature if any application considers even near-live migration of production applications, and the technology presented allows for an easy way to do so.
 
 %\subsubsection*{Aside: Memory Deduplication}
 %
@@ -357,7 +357,7 @@ In Listings~\ref{code:microbenchmark-tcp-nonetns} and~\ref{code:microbenchmark-t
 The complete scripts for the evaluation are included in Listings~\ref{code:microbenchmark-tcp-criu-downtime} and~\ref{code:microbenchmark-tcp-criu-reactivity} for \criu's downtime and reactivity experiments, and in Listings~\ref{code:microbenchmark-tcp-runc-downtime} and~\ref{code:microbenchmark-tcp-runc-reactivity} for \runc's.
 \begin{figure}[h!]
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Checkpoint and restore an established TCP connection using \criu and \runc.\label{code:microbenchmark-tcp-nonetns}}]
+    \begin{lstlisting}[style=Bash,caption={Checkpoint and restore an established TCP connection using \criu and \runc.},label={code:microbenchmark-tcp-nonetns}]
 #!/bin/bash
 # CRIU Dump and Restore, one after the other 
 # but in the BG (not affecting time)
@@ -384,7 +384,7 @@ cd `CWD`) &
 \end{lstlisting}
 \end{minipage}\hfill
 \begin{minipage}{.45\textwidth}
-\begin{lstlisting}[style=Bash,caption={Excerpt of a script to checkpoint a connection within an existing namespace.\label{code:microbenchmark-tcp-netns}}]
+    \begin{lstlisting}[style=Bash,caption={Excerpt of a script to checkpoint a connection within an existing namespace.},label={code:microbenchmark-tcp-netns}]
 #!/bin/bash
 # Two namespaces with path NS_1 and NS_2
 INO_1=$(ls -iL ${NS_1} | awk '{ print $1 }')
@@ -482,7 +482,7 @@ Second, we assume the required container bundle (\texttt{rootfs} directory and \
 These are required to restore the container.
 Note that this assumption could be easily circumvented pre-generating the bundle before executing the migration.
 The procedure to create a \texttt{rootfs} bundle is very straightforward and we include an example in Listing~\ref{code:runc-bundle}.
-\begin{lstlisting}[style=Bash,caption={Commands to generate an OCI bundle to run a container using \runc.\label{code:runc-bundle}}]
+\begin{lstlisting}[style=Bash,caption={Commands to generate an OCI bundle to run a container using \runc.},label={code:runc-bundle}]
 #!/bin/bash
 # Create a new directory for the container
 mdkir ./my-container && cd my-container
@@ -497,7 +497,7 @@ docker export `docker create <image-tag>` | tar -C rootfs -xvf -
 oci-runtime-tool generate <args>
 \end{lstlisting}
 Lastly, it is worth mentioning that the support for rootless containers is still work-in-progress in the \criu project~\cite{criu-user-mode}.
-Therefore, to run the software the user must have \texttt{root} permissions both in both machines (in particular \texttt{CAP\_SYS\_ADMIN}).
+Therefore, to run the software the user must have \texttt{root} permissions in both machines (in particular \texttt{CAP\_SYS\_ADMIN}).
 
 We have also implemented two additional modules.
 One performs all the interactions with the remote host such as transferring files, creating directories, and running \criu commands.
@@ -518,7 +518,7 @@ Lastly, the user can also specify a directory where to mount the \texttt{tmpfs} 
 Otherwise the system will default to, if available, \texttt{/dev/shm}.
 For the remaining of the walkthrough we will assume the default parameters are set: diskless, iterative migration, with a page server running in the remote end and relying on \texttt{/dev/shm} as our \texttt{tmpfs} file system of choice.
 
-The most important part in the migration procedure is a loop that periodically and whilst the amount of memory to transfer exceeds a threshold does the following:
+The most important part in the migration procedure is a loop that periodically and while the amount of memory to transfer exceeds a threshold does the following:
 \begin{enumerate}
     \item \textbf{Create Directories.} The first step is to create the local and remote directories where image files will be stored. This has to be done before anything else as otherwise the page server will report an error and crash.
     \item \textbf{Start Page Server.} As previously introduced, \criu's page server is a one-shot command. This means that once it serves a request it terminates. As a consequence at the start of every iteration the command must be re-run. We start it with the following snippet: \texttt{sudo criu page-server -d --images-dir <path> --prev-images-dir <prev-path>} \\\texttt{--port <port>}. Note that the \texttt{prev-images-dir} is crucial to avoid memory duplication.
@@ -528,7 +528,7 @@ The most important part in the migration procedure is a loop that periodically a
 \end{enumerate}
 We include a simplified version of this loop in Listing~\ref{code:iterative-loop}.
 Most of the technical details have been omitted for simplicity, and should be directly inspected in GitHub.
-\begin{lstlisting}[language=C,caption={Iterative migration internal loop.\label{code:iterative-loop}}]
+\begin{lstlisting}[language=C,caption={Iterative migration internal loop.},label={code:iterative-loop}]
 while (size_to_xfer > MEMORY_THRESHOLD)
 {
     /* Prepare Migration: create directories and start page server */
@@ -575,7 +575,7 @@ while (size_to_xfer > MEMORY_THRESHOLD)
 Once we exit the loop, it means the remaining files to transfer are sufficiently small.
 We then proceed to checkpoint and stop the container, transfer the remaining files, and restore it in the other node.
 We present a simplified version of the code in Listing~\ref{code:last-cp}.
-\begin{lstlisting}[language=C,caption={Snippet for the last (stopping) checkpoint and remote restore.\label{code:last-cp}}]
+\begin{lstlisting}[language=C,caption={Snippet for the last (stopping) checkpoint and remote restore.},label={code:last-cp}]
 /* Prepare Environment: create directories and start page server */
 if (prepare_migration(args, 0) != 0)
 {

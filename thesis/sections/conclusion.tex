@@ -23,7 +23,7 @@ The current implementation can be downloaded and tested from \url{https://github
 
 Our experimental results presented in Chapter~\ref{chap:evaluation}, validate our design.
 Firstly, resource utilization, and in particular disk usage and memory duplication, is drastically reduced when compared to a naive migration approach.
-Secondly, scalability with the size of the allocated memory is better than both naive migration and VM migration, whilst maintaining a baseline of approximately $0.2-0.3$ seconds (bear in mint that this time takes dump, restore, and network transfer and latency into account).
+Secondly, scalability with the size of the allocated memory is better than both naive migration and VM migration, whilst maintaining a baseline of approximately $0.2-0.3$ seconds (bear in mind that this time takes dump, restore, and network transfer and latency into account).
 Thirdly, the throughput in downtime perceived by a network-intensive client when migrating the server to the same location (\textit{i.e.} simulating a maintenance reboot) was under $0.1$ seconds when flooding the link.
 We therefore conclude that this would be close to negligible for a regular client.
 Lastly, we provide a procedure and benchmarking technique to estimate a threshold value necessary for iterative migration.
