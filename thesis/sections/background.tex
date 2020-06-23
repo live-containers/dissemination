@@ -2,7 +2,7 @@
 
 The main goal of this project is to implement live migration of running containers.
 It builds on the concepts of containers, checkpointing, and its implementation in the \criu project.
-This chapter provides a detailed introduction to these concepts as they are necessary to understand the presented contributions.
+This chapter provides a detailed introduction to these concepts as they are necessary to understand the contributions we present later on.
 
 \section{Containers} \label{sec:containers}
 
@@ -31,7 +31,7 @@ The latter modifies the guest OS' source code and replaces sensitive calls with 
 
 \textbf{OS-level Virtualization.}
 Operating System-level virtualization allows for multiple isolated user-space instances, called \textbf{containers} which share a single operating system.
-In comparison to traditional virtual machines, containers add little overhead, require minimal startup, and have a low resource requirement, all this factors make them highly scalable.
+In comparison to traditional virtual machines, containers add little overhead, require minimal startup, and have a low resource requirement, these factors make them highly scalable.
 Containers have experienced an exponential increase in usage, specially with the advent of open-source highly-available container engines such as \textsc{Docker} (\url{https://www.docker.com/}), Linux Containers \textsc{LXC} (\url{https://linuxcontainers.org/}), \textsc{Podman} (\url{https://podman.io/}, among others.
 Given that the goal of this project is to perform efficient live migration of running containers, the following section provides further technical details on containerization.
 
@@ -43,7 +43,7 @@ To achieve this isolation, they rely on two kernel features: control groups and 
 \subsubsection*{Namespaces}
 
 As greatly phrased by Michael Kerrisk in his series of articles on namespaces~\cite{Kerrisk2013}, the purpose of namespaces is to wrap a global system resource and abstract it in a way that each process within the namespace thinks it has its own isolated instance of such resource.
-As of Kernel 5.6, there are eight different types of namespaces, which we present together with a brief description and their respective flag in Table~\ref{table:namespaces}.
+As of Kernel 5.6, there are eight different types of namespaces, which we present together with a brief description in Table~\ref{table:namespaces}.
 \begin{table}[h!]
     \centering
     \rowcolors{1}{gray!20}{}
@@ -55,18 +55,18 @@ As of Kernel 5.6, there are eight different types of namespaces, which we presen
         \texttt{pid} & The \textbf{process ID} isolates the PID number space. This means that two processes in different PID namespaces can have the same identifier. It is very useful in container migration as it allows to restore the processes with the same PID they were dumped with regardless of whether that ID might be taken in the target machine or not. \\[3pt]
         \texttt{net} & \textbf{Network namespaces} provide isolation of the whole network stack. In particular network devices, interfaces, routing tables, iptables rules, and sockets. \\[3pt]
         \texttt{ipc} & The \textbf{Interprocess Communication namespace} provides isolation for POSIX semaphore queues, semaphore sets and shared memory segments.\\[3pt]
-        \texttt{uts} & The \textbf{UNIX Time Sharing namespace} allows processes to set a hostname or domainname for that particular namespace without affecting the rest of the system. \\[3pt]
+        \texttt{uts} & The \textbf{UNIX Time Sharing namespace} allows processes to set a hostname or domain name for that particular namespace without affecting the rest of the system. \\[3pt]
         \texttt{user} & \textbf{User namespaces} isolate security-related identifiers such as user and group identifiers (UID, GID) and capabilities. This allows for a process to have privileges within a certain namespace but not outside its scope. \\[3pt]
-        \texttt{cgroup} & The \textbf{Control Group namespace} virtualizes the contents of \texttt{/proc/self/cgroup}. As a consequence each different namespace has a different cgroup root directory.\\[3pt]
+        \texttt{cgroup} & The \textbf{Control Group namespace} virtualizes the contents of \texttt{/proc/self/cgroup}. As a consequence each different namespace has a different \texttt{cgroup} root directory.\\[3pt]
         \texttt{time} & The \textbf{time namespace} has been the latest addition to the group. Included in Kernel 5.6, it allows different namespaces to have different offsets to the system monotonic and boot-time clock.\\[3pt]
         \hline
     \end{tabular}
     \caption[List of the different namespaces supported in Kernel 5.6.]{List of the different namespaces supported in Kernel 5.6. and a brief description of the isolation they provide.\label{table:namespaces}}
 \end{table}
-In order to create a new namespace of a given time, we can follow two approaches.
+In order to create a new namespace of a given type, we can follow two approaches.
 With the \texttt{clone} system call, we can create a new child process, in a similar way to \texttt{fork} but with higher control of what pieces of execution context are inherited~\cite{clone-manual}.
 More specifically, with the \texttt{unshare} system call we can specifically unshare a namespace from parent process~\cite{unshare-manual}.
-To join an existing namespace, we can use the \texttt{setns} syscall, which given a file descriptor referring to a namespace, it links the calling process to it.~\cite{setns-manual}.
+To join an existing namespace, we can use the \texttt{setns} syscall, which, given a file descriptor referring to a namespace, it links the calling process to it~\cite{setns-manual}.
 These operations require the \texttt{CAP\_SYS\_ADMIN} capability.
 In Listings~\ref{code:namespaces-unshare} and~\ref{code:namespaces-setns} we include examples of usage of \texttt{unshare} and \texttt{setns} respectively.
 \begin{figure}[h!]
@@ -151,7 +151,7 @@ We have chosen to skip the engine layer and interact with the runtime as support
 
 There are a variety of container engines available.
 \texttt{Docker} was the company that started exploiting containers commercially.
-It is most likely the best-known tool and the main responsible to the rapid adoption of the technology.
+It is most likely the best-known tool and the main responsible for the rapid adoption of the technology.
 However, there are several alternatives.
 
 Given its pivotal importance, we differentiate between container engines that rely on \runc as their runtime of choice, and those which don't.
@@ -170,7 +170,7 @@ Unfortunately, it has reached end-of-life and is not currently maintained.
 This is, instead of relying on standard container isolation techniques, they use VM-native isolation (hardware-backed) to provide further security guarantees.
 In particular, each container is hypervisor-isolated, meaning two different containers have different kernels.
 \texttt{crun} (\url{https://github.com/containers/crun}) is a re-implementation of \runc in C.
-Its main focus is on performance and memory footprint.
+Its main focus is on performance and reduced memory footprint.
 In both cases \texttt{crun} surpasses \runc.
 \texttt{railcar} (\url{https://github.com/oracle/railcar}) is another runtime implementation born from the idea that \textsc{Go} might not be the best programming language to implement a container runtime.
 With memory safety in mind, Oracle, the company behind \texttt{railcar}, decided to implement an OCI-compliant runtime in \textsc{Rust}.
@@ -193,6 +193,7 @@ Running a container with \runc is slightly different than doing it in, let's say
 In particular, in \runc there is no notion of \textit{images}.
 To run a container, a user must provide a specification file (\texttt{config.json}) and a root file system in a directory (\texttt{rootfs}).
 Through the specification file several low-level options such as namespaces, control groups, and capabilities can be configured.
+The pair \texttt{config.json} and \texttt{rootfs} is referred to as OCI bundle.
 
 \section{Checkpointing} \label{sec:bg-cp}
 
@@ -246,7 +247,7 @@ Post-copy migration follows a radically different approach.
 Initially, it transfers the minimal information for the process to be able to resume on the destination host~\cite{Shirbam2012}.
 Then, page faults in the new host are resolved over the network, sending a request for a page that was not sent in the initial batch.
 This approach tends to be faster (lower total migration time) than pre-copy, but incurs in service degradation as page faults become extremely costly.
-In the literature post-copy migration is also referred to as \textbf{lazy migration}.
+In the literature, post-copy migration is also referred to as \textbf{lazy migration}.
 
 \subsection{Distributed Checkpointing}
 
@@ -255,19 +256,19 @@ This is, given a process running in different physical hosts, how to coordinate 
 Reaching consensus among a set of distributed processes is a well-studied topic in the distributed systems field, and an existing algorithm for distributed snapshotting was presented in 1985 by Chandy and Lamport~\cite{Lamport1985}.
 Since then, more and more algorithms have been presented~\cite{Raynal2013,Kshemkalyani2008} optimizing certain aspects of the process.
 However, transparent distributed C/R is yet to be implemented in a software tool.
-The work here presented aims to be a step in this direction by facilitating live migration of containers with established TCP connections and external namespaces (external in the sense that are not created by the migrated process).
+The work here presented aims to be a step in this direction by facilitating live migration of containers with established TCP connections and external namespaces (external in the sense that they are not created by the migrated process).
 
 \section{\criu: Checkpoint Restore in Userspace} \label{sec:bg-criu}
 
 Checkpoint/Restore in Userspace (\criu) is an open-source C/R tool~\cite{criu-main-page}.
 Introduced in 2011, its distinctive feature is that it is mainly implemented in user space, rather than in the kernel, by using existing interfaces~\cite{Reber2016}.
-One of the most important interface is \texttt{ptrace}~\cite{ptrace-manpage}, as it relies on it for seizing the target process.
+One of the most important interface is \texttt{ptrace}~\cite{ptrace-manpage}, as \criu relies on it for seizing the target process.
 For other interfaces, several patches have been pushed to the mainline kernel by \criu developers~\cite{criu-kernel-patches}.
-The project is currently under active development~\cite{criu-github}, and its main focus is to support the migration of containers.
+The project is currently under active development~\cite{criu-github}, and its main focus is to support the checkpoint and migration of containers.
 
 \subsection{A Technical Overview on \criu}
 
-The main goal of \criu is to perform a snapshot the current process' tree state to a set of image files, so that it can be later restored that exact point in time, without reproducing the steps that led to it.
+The main goal of \criu is to perform a snapshot of the current process' tree state to a set of image files, so that it can be later restored at that exact point in time, without reproducing the steps that led to it.
 
 \subsubsection*{Checkpoint}
 
@@ -281,13 +282,13 @@ Once all tasks are frozen, \criu collects all the information it can about the t
 File descriptors and registers are dumped through a \texttt{ptrace} interface and are parsed from \texttt{/proc/\$pid/fd} and \texttt{/proc/\$pid/stat} respectively.
 In order to dump the contents of memory and credentials, a novel technique is introduced, the \textbf{parasite code}.
 
-The parasite code is a binary blob built as a position independent executable (PIE) for execution inside another process address space.
+The parasite code is a binary blob built as a position independent executable (PIE) for execution inside another process' address space.
 Its purpose is to execute \criu calls from within the dumpee's task address space~\cite{criu-parasite-code}.
 To achieve this goal, \criu must:
 \begin{enumerate}
-    \item Move task into seized state calling \texttt{ptrace(PTRACE\_SEIZE, ...)}. Note that the task is stopped without it noticing, hence not altering its state.
+    \item Move the task into seized state calling \texttt{ptrace(PTRACE\_SEIZE, ...)}. Note that the task is stopped without it noticing, hence not altering its state.
     \item Inject an \texttt{mmap} syscall in the current stack's instruction pointer, and allocate memory for the whole code blob. At this stage, space for exchanging parameters and results is also allocated within the dumpee's process address space. \criu is now ready to run parasite service routines.
-    \item The external dumping process retrieves information about the dumpee's address space through the parasite code either through \emph{trap} mode (one command at a time) or \texttt{daemon} mode (in which the parasite behaves as a UNIX socket.
+    \item The external dumping process retrieves information about the dumpee's address space through the parasite code either through \emph{trap} mode (one command at a time) or \emph{daemon} mode (in which the parasite behaves as a UNIX socket).
     \item With information about used memory areas and important flags read from \texttt{/proc/\$pid/smaps/} and \texttt{/proc/\$pid/pagemap}, the parasite code transfers the actual content outside through a set of pipes, which in turn gets translated into image files.
 \end{enumerate}
 Lastly, the target process is cured from the parasite by closing it, unmapping its allocated memory area, and reverting to the original frozen state.
@@ -302,7 +303,7 @@ Starting with kernel 5.3 and the new \texttt{clone3()} system call, it becomes n
 
 Then \criu restores all basic task resources such as file descriptors, namespaces, maps, ...
 The only resources that are \emph{not} restored at this stage are, most notably, memory mappings.
-In order to restore memory areas, and since the morphing is done \textit{in-place}, before exiting \criu would have to unmap itself and map the application code.
+In order to restore memory areas, and since the morphing is done \textit{in-place}, before exiting \criu would have to \texttt{unmap} itself and map the application code.
 To overcome this issue, a similar approach to the parasite code one is followed, the \textbf{restorer blob}.
 The restorer blob is a piece of PIE code, to which \criu transfers control to unmap itself and map the appropriate code and memory areas for the process to restore successfully.
 
@@ -311,7 +312,7 @@ The restorer blob is a piece of PIE code, to which \criu transfers control to un
 As \criu operates by design on a single system, support for live migration requires further user interaction~\cite{criu-live-migration}.
 In particular, it is up to the user to ensure that the dump files are on the remote host upon restore.
 Furthermore, IP addresses used by the application in the original host, must also be available in the new one.
-With that said, \criu developers implemented \texttt{P-Haul}~\cite{criu-phaul}, a library specially targeted for live migration using \criu.
+With that said, \criu developers implemented \textsc{P.Haul}~\cite{criu-phaul}, a library specially targeted for live migration using \criu.
 At the time of the writing, the project is currently inactive.
 
 The most natural way to manually perform a live migration is to use the iterative approach as we will cover later.
@@ -326,8 +327,8 @@ The main differences between C/R tools are the way they interact with the kernel
 \criu is implemented completely in userspace, and as a consequence relies heavily on existing kernel interfaces, otherwise execution fails.
 Additionally, \criu's target application are containers.
 
-Other open-source tools that implement C/R are \criu, \texttt{DMTC}~\cite{dmtcp}, and \texttt{BLCR}~\cite{blcr}.
-They both focus on high performance, what motivates some of their design choices.
+Other open-source tools that implement C/R are \texttt{DMTC}~\cite{dmtcp}, and \texttt{BLCR}~\cite{blcr}.
+They both focus on high performance computing, what motivates some of their design choices.
 
 \textbf{DMTCP.}
 
