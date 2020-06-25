@@ -31,7 +31,7 @@ According to the Linux Programmer's Manual~\cite{tmpfs-manpage}, this file syste
 Since the files actually reside in memory, the user benefits from memory-like read/write performance.
 A notable use of \texttt{tmpfs} is \texttt{/dev/shm}, used in the POSIX-compliant implementation of shared memory and in POSIX semaphores.
 One such file system can be easily created and destroyed using \texttt{mount} and \texttt{umount} as detailed in Listing~\ref{code:tmpfs-example}
-\begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} file system.\label{code:tmpfs-example}}]
+\begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} file system.},label={code:tmpfs-example}]
 #!/bin/bash
 # Mount a tmpfs file system rooted in the /tmp/my-tmpfs directory with maximum size 100 MB
 mkdir /tmp/my-tmpfs
@@ -172,35 +172,6 @@ The complete scripts used for the benchmarking are included in Listing \ref{code
     \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running process using \criu.},label={code:microbenchmark-iterative-runc}]
 #!/bin/bash
 # First Pre-Dump
-sudo runc checkpoint \
-    --pre-dump \
-    --image-path ./images/1/ \
-    <container_name>
-
-sudo runc list # Container running
-
-# Second Pre-Dump
-sudo runc checkpoint \
-    --pre-dump \
-    --parent-path ../1/ \
-    --image-path ./images/2/ \
-    <container_name>
-
-sudo runc list # Still running
-
-# Last Dump
-sudo runc checkpoint \
-    --parent-path ../2/ \
-    --image-path ./images/3/ \
-    <container_name>
-
-# Container is now stopped
-\end{lstlisting}
-\end{minipage}\hfill
-\begin{minipage}{.45\textwidth}
-    \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running container using \runc.},label={code:microbenchmark-iterative-criu}]
-#!/bin/bash
-# First Pre-Dump
 sudo criu pre-dump \
     -t  PROCESS_PID \
     --images-dir images/1 \
@@ -224,6 +195,35 @@ sudo criu dump \
     --track-mem
 
 # Process is now stopped
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}{.45\textwidth}
+    \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running container using \runc.},label={code:microbenchmark-iterative-criu}]
+#!/bin/bash
+# First Pre-Dump
+sudo runc checkpoint \
+    --pre-dump \
+    --image-path ./images/1/ \
+    <container_name>
+
+sudo runc list # Container running
+
+# Second Pre-Dump
+sudo runc checkpoint \
+    --pre-dump \
+    --parent-path ../1/ \
+    --image-path ./images/2/ \
+    <container_name>
+
+sudo runc list # Still running
+
+# Last Dump
+sudo runc checkpoint \
+    --parent-path ../2/ \
+    --image-path ./images/3/ \
+    <container_name>
+
+# Container is now stopped
 \end{lstlisting}
 \end{minipage}
 \end{figure}

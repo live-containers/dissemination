@@ -9,11 +9,11 @@ The virtual machine (VM) placement problem~\cite{Masdari2016,Strunk2012} has stu
 
 Checkpoint-Restore is, through live migration, a technique to provide application-level load-balancing capabilities to cloud tenants transparently to the user.
 By dumping the state of an application and restoring it in another physical instance, it will resume from the exact point it was dumped at.
-As a consequence the user will perceive a minimal downtime and the tenant will have re-allocated resources.
+As a consequence, the user will perceive a minimal downtime and the tenant will have re-allocated resources.
 Originally developed for the High Performance Computing (HPC) domain, checkpointing was used to save intermediate long-running job's state.
 In the event of an unexpected failure, the job could be restarted from the last stored checkpoint, rather than restart and effectively lose several hours or days worth of work~\cite{Barker2014}.
 Checkpoint-Restore in Userspace (CRIU)~\cite{criu-main-page} is a software tool to dump and restore processes transparently to the user.
-It does so entirely from user-space, by strongly leveraging interfaces exposed by the Linux kernel.
+It does so entirely from userspace, by strongly leveraging interfaces exposed by the Linux kernel.
 If such interfaces do not exist, the project's contributors have a long history of accepted kernel patches~\cite{criu-kernel-patches}.
 \criu is an open-source project and it targets specially applications running inside containers.
 As of June 2020, most container engines offering checkpoint-restore functionalities such as \textsc{Docker}, \textsc{Podman}, or \textsc{LXC}, rely on \criu at a lower level.
@@ -44,7 +44,7 @@ Our main objectives for the project can be summarized in the following list:
 
 In order to achieve \textbf{O1}, \textbf{O2}, and \textbf{O3}, we define a series of tasks our implementation presented in \S\ref{chap:system} must fulfil.
 Note that these objectives and tasks are only implementation-oriented.
-Part of the contribution of this work are also bibliographical in the sense that we cover all the relevant material that helps us in the process of achieving the objectives.
+Part of the contribution of this work is also bibliographical in the sense that we cover all the relevant material that helps us in the process of achieving the objectives.
 These non-tangible tasks and objectives are included in the final list of contributions.
 \begin{itemize}
     \item[\textbf{T1}] Implement support to migrate interactive, memory-intensive, containers.
@@ -57,7 +57,7 @@ These non-tangible tasks and objectives are included in the final list of contri
 
 To put it in a nutshell, the main contributions of the work here presented are listed beneath:
 \begin{itemize}
-    \item[\textbf{C1}] An exhaustive micro-evaluation of different \criu features, their performance, and their integration with \runc.
+    \item[\textbf{C1}] An exhaustive micro-benchmark of different \criu features, their performance, and their integration with \runc.
     \item[\textbf{C2}] An open-source library for live migration of \runc containers using \criu.
     \item[\textbf{C3}] An easy to use binary to transparently migrate containers from one host to another with minimal dependencies and set up.
     \item[\textbf{C4}] An evaluation of our solution and a comparison with virtual machine migration.
@@ -75,12 +75,12 @@ As the goal of a Master's thesis is educational in nature, we have decided to in
 These references are both informative and educational, and will enable an interested reader to follow our same learning process which, in a document of this sort, is not to be underestimated.
 In particular, we cover relevant bibliography on containers (\S\ref{sec:rw-cont}), \criu and C/R (\S\ref{sec:rw-criu}), and applications in live migration (\S\ref{sec:rw-app}).
 
-In Chapter~\ref{chap:system} we present the building blocks of our system (\S\ref{sec:arch-blocks}): diskless migration, iterative migration, and TCP and namespace migration.
+In Chapter~\ref{chap:system} we present the building blocks of our system (\S\ref{sec:arch-blocks}): diskless migration, iterative migration, and TCP sockets and namespace migration.
 For each concept, we present it's underlying theory together with a shell script to leverage it, it's implementation details in \criu, and the integration with \runc.
 Additionally, we micro-benchmark it's functionality comparing the vanilla performance with \criu's and \runc's.
 Then, in~\S\ref{sec:system} we cover in detail the implementation details of our solution, covering the most relevant code snippets, motivating our design choices (mostly with results from the previous section) and covering some helper modules we also implemented.
 
-In Chapter~\ref{chap:evaluation} we put our system to work and, instead of micro benchmarking particular features, we evaluate it as a whole through two different macro benchmarks.
+In Chapter~\ref{chap:evaluation} we put our system to work and, instead of micro-benchmarking particular features, we evaluate it as a whole through two different macro-benchmarks.
 First, in~\S\ref{sec:eval-downtime}, we assess the impact different design choices have on the overall application downtime.
 Downtime is the key metric in live migration as it assesses the time the application is not running.
 Minimizing it is, in turn, the ultimate goal of efficient live migration.
