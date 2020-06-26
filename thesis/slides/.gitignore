@@ -1,0 +1,15 @@
+csg-temp
+*.aux
+*.bbl
+*.blg
+*.latexmain
+*.bcf
+*.log
+*.nav
+*.out
+*.run.xml
+*.snm
+*.toc
+*.pdf
+*.mp4
+tags

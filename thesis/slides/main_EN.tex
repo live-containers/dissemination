@@ -1,0 +1,328 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Carlos Segarra's Beamer Presentation Template. All credits
+%% to Vincent Labatut from whom I took the template and added
+%% my own flavour to it. Kudos to <vincent.labatut@univ-avignon.fr>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% setup Beamer
+\documentclass[9pt,    % default is 11pt, use 10pt for more compact slides
+%    handout,            % collapse all overlays (=animations) and video-invert console text
+    english,            % presentation language (theme supports only french & english)
+    xcolor=table,       % colors in the tables
+    envcountsect,        % include section number in theorem numbers
+    aspectratio=169     % Using 16:9 aspect ratio because 2019
+]{beamer}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% setup the theme
+%\usepackage{au/sty/beamerthemeAU}         % no option at all
+\usepackage[light]{csg-temp/sty/beamerthemeAU}   % the "light" option only changes the title and section pages
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% setup side notes
+\usepackage{pgfpages}                                   % comment all 3 below lines to hide notes
+%\setbeameroption{show notes}                           % alternate content and note slides
+%\setbeameroption{show only notes}                      % only note slides
+%\setbeameroption{show notes on second screen=right}    % dualscreen: right, left, top, bottom
+%\usepackage{enumitem}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% name of the biblatex file
+\addbibresource{biblio.bib}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% External Packages
+\usepackage{datenumber}
+\usepackage{varwidth}
+\usepackage[normalem]{ulem}
+
+% Math Mode
+%\usepackage{algorithm}
+%\usepackage{algorithmic}
+%\usepackage{algorithm2e}
+%\usepackage{multicol}
+%\usepackage[noend]{algpseudocode}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% title and subtitle of the presentation (the latter is optional)
+\newcommand{\mainTitle}{Checkpoint/Restore of Established TCP Connections}
+\newcommand{\secondTitle}{Design, Implementation, and Evaluation on runC Containers}
+\subtitle{Decentralized Systems} % leave empty if no subtitle
+\title[C/R of Established TCP Connections] % leave empty for no title in footer
+    {\Large \mainTitle \\ \normalsize \secondTitle}
+\subtitle{Decentralized Systems - Final Results Presentation} % leave empty if no subtitle
+%\subtitle{Master in Research in Informatics - MIRI}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% date of the presentation (leave empty for no date, default is today)
+\date[May 22, 2020] % leave empty for no date in footer
+    {Friday May 22, 2020}
+    %{\datedayname, \today}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% authors and their affiliations (the latter is optional)
+\author[] % leave empty for no author in footer
+{Carlos Segarra - \texttt{carlos.segarra@estudiant.upc.edu}}
+%{\inst{1} Computer Science Lab, Avignon University -- LIA EA 4128 \texttt{\{firstname.lastname\}@univ-avignon.fr}
+%\and \inst{2} Institute of Disruptive Innovation, University of Excellence \texttt{\{firstname.lastname\}@univ-excell.fr}
+%}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% optional: additional logo (ex. lab)
+%\titlegraphic{\includegraphics[width=3cm,]{images/logo_FME.png}}
+% if you want several logos, put them in a box
+%\titlegraphic{\parbox{3cm}{\includegraphics[width=3cm,]{images/ceri_logo.pdf}\newline\includegraphics[width=3cm,]{images/lia_logo.pdf}}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Presentation speciphic packages
+% \usepackage{multicol}
+% \usepackage[titles]{tocloft}
+% \renewcommand{\cftchapfont}{\normalfont\bfseries}
+\usetikzlibrary{decorations.pathmorphing, patterns}
+\usepackage{tabularx}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{multimedia}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+%%% title page
+%% Outline of the presentation
+% 1. Initial Project Presentation
+%   1.1. Checkpoint/Restore of Established TCP Connections
+% 2. Background Concepts
+%   2.1. Criu socket checkpoint
+%   2.2. Namespaces checkpoint
+% 3. The original idea:
+% 4. What we currently have:
+%   4.1. C/R of Established TCP Connections
+%   4.2. C/R of Established TCP Connections Through a Namespace
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}
+    \frametitle{Project Outline}
+    \framesubtitle{\textcolor{red}{Updated} Problem Statement}
+
+
+    \textbf{\textcolor{blue}{Problem Motivation*:}}
+    \begin{itemize}
+        \item \textbf{\textcolor{blue}{Containers}} have become the go-to alternative for sandboxing and deploying distributed applications, they build on the concept of \textbf{\textcolor{blue}{namespaces}}.
+        \item \href{https://en.wikipedia.org/wiki/Application_checkpointing}{Checkpointing} provides systems with \textbf{\textcolor{blue}{fault-tolerance}} and \textbf{\textcolor{blue}{state consistency}} enabling rollback and restore from previous stable versions.
+        \item \textbf{\textcolor{blue}{Live migration}} consists in transparently relocating running services for improved resource-management and increased QoS.
+        \item Support for checkpointing containers is very limited (\href{https://github.com/docker/cli/blob/master/experimental/checkpoint-restore.md}{[Link 1]}, \href{https://criu.org/Docker}{[Link 2]}) and only in experimental mode. 
+    \end{itemize}
+
+    \begin{alertblock}{Main Goal}
+        Design, implementation, and evaluation of a \sout{distributed} checkpoint/restore technique for \textcolor{red}{established TCP connections} between processes and runC containers.
+    \end{alertblock}
+
+    \vspace{1pt}
+    \small
+    \begin{description}
+        \item *This work is complementary, and builds on, my MSc Thesis under the supervision of Jordi Guitart.
+    \end{description}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Background Concepts}
+    \framesubtitle{What is a runC Container?}
+
+    \textbf{\textcolor{blue}{Introduction to runC:}}
+    \begin{itemize}
+        \item \textbf{\textcolor{blue}{runc}} is a tool to spawn containers according to the OCI specification.
+        \item Rather than \textbf{\textcolor{blue}{images}}, it relies on OCI bundles: \texttt{config.json} + \texttt{rootfs}.
+        \item It sits at the core of most container engines as depicted in Figure~\ref{fig:runc}.
+    \end{itemize}
+
+    \begin{figure}[h!]
+        \includegraphics[width=.5\textwidth]{./images/runc.png}
+        \caption{Placing runC in the call stack of standard container engines.\label{fig:runc}}
+    \end{figure}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Background Concepts}
+    \framesubtitle{What is checkpointing and how can we do it?}
+
+    \vspace{-15pt}
+
+    \begin{columns}[t]
+        \begin{column}{.65\textwidth}
+            \textbf{Checkpoint/Restore:}
+            \begin{itemize}
+                \item \textbf{\textcolor{blue}{Checkpointing}} is a technique to \textbf{\textcolor{blue}{save}} the state of a running process.
+                \item The \textbf{\textcolor{blue}{state}} is made up of: memory, pipes, sockets, ...
+                \item This state is used to \textbf{\textcolor{blue}{restore}} the process.
+                \item Originated in HPC and popularized through Virtual Machines.
+                \item \textbf{\textcolor{blue}{CRIU (Checkpoint/Restore in Userspace)}} is a tool to perform C/R from userspace transparently to the user.
+            \end{itemize}
+        \end{column}\hfill
+        \begin{column}{.35\textwidth}
+            \vspace{-18pt}
+            \begin{figure}
+                \centering
+                \includegraphics[width=.8\textwidth]{./images/cr.png}
+                \caption{Basic working principle of C/R.}
+            \end{figure}
+        \end{column}
+    \end{columns}
+
+\end{frame}
+
+\begin{frame}
+    \frametitle{Background Concepts}
+    \framesubtitle{How can we checkpoint TCP connections?}
+
+    \begin{columns}[t]
+        \begin{column}{.65\textwidth}
+            \textbf{\textcolor{blue}{Checkpoint/Restore of Unix sockets:}} 
+            \begin{itemize}
+                \item We rely on \textbf{\textcolor{blue}{CRIU}} to perform C/R from userspace, \textbf{\textcolor{blue}{transparently}} to the user.
+                \item To \textbf{\textcolor{blue}{checkpoint}}, CRIU gathers information from FDT and dumps the content.
+                \item To \textbf{\textcolor{blue}{restore}}, it depends on the socket state:
+                \begin{itemize}
+                    \item \texttt{LISTEN}: restore as any other file.
+                    \item \texttt{CONNECTED}:
+                    \begin{enumerate}
+                        \item Establish a listening anon. socket.
+                        \item Create a socket at the desired FD (dumped one).
+                        \item Connect to the fake end and call \texttt{dup2}.
+                    \end{enumerate}
+                \end{itemize}
+            \item We need to bind to the \textbf{\textcolor{blue}{same}} IP address.
+            \item Inbound packets are dropped by the netfilter in Table~\ref{table:filter}.
+            \end{itemize}
+        \end{column}
+        \begin{column}{.40\textwidth}
+            \vspace{-18pt}
+            \begin{table}
+                \centering
+                {\ttfamily \scriptsize
+                \begin{tabular}{p{0.7cm}p{0.3cm}p{0.3cm}p{0.5cm}p{0.5cm}p{1.2cm}}
+                    \multicolumn{6}{l}{Chain INPUT (policy ACCEPT)} \\
+                    target & prot & opt & source & dest & \\
+                    CRIU & all & -- & .../0 & .../0 & \\
+                    & & & & & \\
+                    \multicolumn{6}{l}{Chain FORWARD (policy ACCEPT)} \\
+                    target & prot & opt & source & dest & \\
+                    & & & & & \\
+                    \multicolumn{6}{l}{Chain OUTPUT (policy ACCEPT)} \\
+                    target & prot & opt & source & dest & \\
+                    CRIU & all & -- & .../0 & .../0 & \\
+                    & & & & & \\
+                    \multicolumn{6}{l}{Chain CRIU} \\
+                    target & prot & opt & source & dest & \\
+                    ACCEPT & all & -- & .../0 & .../0 & mark 0xc1 \\
+                    DROP & all & -- & .../0 & .../0 & \\
+                \end{tabular}
+                }
+                \caption{Output of running \texttt{iptables -t filter -L -n}.\label{table:filter}}.
+            \end{table}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Evaluation}
+    \framesubtitle{Perceived Throughput by the Client End}
+
+    \vspace{10pt}
+
+    \textbf{\textcolor{blue}{We drop packets, but what's the impact on performance?}}
+    \begin{itemize}
+        \item \texttt{iPerf3} client in one VM and \texttt{iPerf3} server in another VM (same LAN).
+        \item \texttt{t=0} start client, \texttt{t=10} dump the server, \texttt{t=12} restore the server.
+        \item One experiment server as standalone process, another one in a container.
+    \end{itemize}
+
+    \vspace{-5pt}
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{./images/tcp_established_downtime_microbenchmark.pdf}
+        \caption{Throughput from the client as a function of time.\label{fig:evaluation-downtime}}
+    \end{figure}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Evaluation}
+    \framesubtitle{Perceived Throughput by the Client End}
+
+    \vspace{10pt}
+
+    \textbf{\textcolor{blue}{How reactive is to sudden changes?}}
+    \begin{itemize}
+        \item \texttt{t=0} start client, dump server at \texttt{t=6,10,14} restore immediately.
+        \item Where does the difference in downtime comes from?
+        \item We don't know! Hidden caching, TCP's congestion and hold back times, \texttt{iPerf3}'s reactivity, ...
+    \end{itemize}
+
+    \vspace{-5pt}
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{./images/tcp_established_resolution_microbenchmark.pdf}
+        \caption{Throughput from the client as a function of time.\label{fig:evaluation-downtime}}
+    \end{figure}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Problem}
+    \framesubtitle{How can we ensure that the same IP can be reused?}
+
+    \begin{columns}
+        \begin{column}{.45\textwidth}
+            \textbf{\textcolor{blue}{Restore the same IP in a different environment:}}
+            \begin{itemize}
+                \item Migration within the same machine:
+                \begin{itemize}
+                    \item Use namespaces and virtual Ethernet pairs (Figure \ref{fig:architecture}).
+                    \item Supported by runC containers (use-case particularly suitable).
+                    \item Demonstrated in intermediate results presentation.
+                \end{itemize}
+                \vspace{5pt}
+                \item Migration to a remote machine:
+                \begin{itemize}
+                    \item Two VMs and a third one listening.
+                    \item Manually compress and migrate image files.
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+        \begin{column}{.55\textwidth}
+            \vspace{-20pt}
+            \begin{figure}[t!]
+                \includegraphics[width=.85\textwidth]{./images/architecture.png}
+                \caption{Two different setups for IP reuse.\label{fig:architecture}}
+            \end{figure}
+        \end{column}
+    \end{columns}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Future Work \& Questions}
+
+    \textbf{\textcolor{blue}{Work to-do:}}
+    \begin{itemize}
+        \item Remote migration with containers still not working.
+        \item Once it does, have a similar evaluation comparing CRIU and runC.
+    \end{itemize}
+
+    \vspace{15pt}
+
+    \begin{center}
+        Thank you for your attention,\\[5pt]
+
+        \Large
+        \textbf{\textcolor{blue}{Observations, Doubts \& Suggestions Welcome}}\\[25pt]
+
+        \normalsize
+        Follow the development:\\ \url{https://github.com/live-containers/live-migration}\\[15pt]
+        \url{carlos.segarra@estudiant.upc.edu}
+    \end{center}
+\end{frame}
+
+\end{document}
