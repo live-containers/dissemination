@@ -108,44 +108,60 @@
 \end{frame}
 
 \begin{frame}
-    \frametitle{Project Outline}
-    \framesubtitle{\textcolor{red}{Updated} Problem Statement}
+    \frametitle{Introduction}
+    \framesubtitle{Framing the Work}
 
-
-    \textbf{\textcolor{blue}{Problem Motivation*:}}
+    \textbf{\textcolor{blue}{Problem Motivation:}}
     \begin{itemize}
         \item \textbf{\textcolor{blue}{Containers}} have become the go-to alternative for sandboxing and deploying distributed applications, they build on the concept of \textbf{\textcolor{blue}{namespaces}}.
         \item \href{https://en.wikipedia.org/wiki/Application_checkpointing}{Checkpointing} provides systems with \textbf{\textcolor{blue}{fault-tolerance}} and \textbf{\textcolor{blue}{state consistency}} enabling rollback and restore from previous stable versions.
+        \item \textbf{\textcolor{blue}{Checkpoint-Restore in Userspace (CRIU)}} is a tool to perform checkpoint-restore of processes, transparently to the user.
         \item \textbf{\textcolor{blue}{Live migration}} consists in transparently relocating running services for improved resource-management and increased QoS.
-        \item Support for checkpointing containers is very limited (\href{https://github.com/docker/cli/blob/master/experimental/checkpoint-restore.md}{[Link 1]}, \href{https://criu.org/Docker}{[Link 2]}) and only in experimental mode. 
     \end{itemize}
 
-    \begin{alertblock}{Main Goal}
-        Design, implementation, and evaluation of a \sout{distributed} checkpoint/restore technique for \textcolor{red}{established TCP connections} between processes and runC containers.
-    \end{alertblock}
+    \begin{columns}
+        \begin{column}{.1\textwidth}
+        \end{column}\hspace{-5cm}
+        \begin{column}{.7\textwidth}
+            \begin{alertblock}{Main Goal}
+                Design, implement, and evaluate a tool for efficient live migration of running containers using CRIU.
+            \end{alertblock}\hfill
+        \end{column}
+    \end{columns}
 
-    \vspace{1pt}
-    \small
-    \begin{description}
-        \item *This work is complementary, and builds on, my MSc Thesis under the supervision of Jordi Guitart.
-    \end{description}
 \end{frame}
 
 \begin{frame}
     \frametitle{Background Concepts}
-    \framesubtitle{What is a runC Container?}
+    \framesubtitle{Containers and runC}
 
-    \textbf{\textcolor{blue}{Introduction to runC:}}
-    \begin{itemize}
-        \item \textbf{\textcolor{blue}{runc}} is a tool to spawn containers according to the OCI specification.
-        \item Rather than \textbf{\textcolor{blue}{images}}, it relies on OCI bundles: \texttt{config.json} + \texttt{rootfs}.
-        \item It sits at the core of most container engines as depicted in Figure~\ref{fig:runc}.
-    \end{itemize}
+    \only<1>{
+        \textcolor{blue}{\textbf{Linux Containers:}}
+        \begin{alertblock}{Definition}
+            A linux container is a set of processes isolated from the rest of the system.
+        \end{alertblock}
+        \begin{itemize}
+            \item They rely on \textbf{\textcolor{blue}{namespaces}} and \textbf{\textcolor{blue}{control groups}} for fine-grained resource control.
+            \item A \textbf{\textcolor{blue}{container engine}} transforms a \emph{container image} into a running process relying on a chosen \emph{runtime}.
+        \end{itemize}
+    }
 
-    \begin{figure}[h!]
-        \includegraphics[width=.5\textwidth]{./images/runc.png}
-        \caption{Placing runC in the call stack of standard container engines.\label{fig:runc}}
-    \end{figure}
+    \only<1-2>{
+        \textbf{\textcolor{blue}{Introduction to runC:}}
+        \begin{itemize}
+            \item \textbf{\textcolor{blue}{runc}} is a tool to spawn containers according to the OCI specification.
+            \item Rather than \textbf{\textcolor{blue}{images}}, it relies on OCI bundles: \texttt{config.json} + \texttt{rootfs}.
+            \item It sits at the core of most container engines as depicted in Figure~\ref{fig:runc}.
+        \end{itemize}
+    }
+
+    \only<2>{
+        \begin{figure}[h!]
+            \includegraphics[width=.5\textwidth]{./images/runc.png}
+            \caption{Placing runC in the call stack of different container engines.\label{fig:runc}}
+        \end{figure}
+    }
+
 \end{frame}
 
 \begin{frame}
