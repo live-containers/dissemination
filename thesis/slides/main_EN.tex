@@ -136,6 +136,8 @@
     \framesubtitle{Containers and runC}
 
     \only<1>{
+        \vspace{-15pt}
+
         \textcolor{blue}{\textbf{Linux Containers:}}
         \begin{alertblock}{Definition}
             A linux container is a set of processes isolated from the rest of the system.
@@ -143,15 +145,16 @@
         \begin{itemize}
             \item They rely on \textbf{\textcolor{blue}{namespaces}} and \textbf{\textcolor{blue}{control groups}} for fine-grained resource control.
             \item A \textbf{\textcolor{blue}{container engine}} transforms a \emph{container image} into a running process relying on a chosen \emph{runtime}.
+            \item Some well-known container engines are \textsc{Docker}, \textsc{Podman}, and \textsc{Cri-O}.
         \end{itemize}
     }
 
     \only<1-2>{
         \textbf{\textcolor{blue}{Introduction to runC:}}
         \begin{itemize}
-            \item \textbf{\textcolor{blue}{runc}} is a tool to spawn containers according to the OCI specification.
+            \item \textbf{\textcolor{blue}{runc}} is the Open Container Initiative's (OCI) reference runtime implementation.
             \item Rather than \textbf{\textcolor{blue}{images}}, it relies on OCI bundles: \texttt{config.json} + \texttt{rootfs}.
-            \item It sits at the core of most container engines as depicted in Figure~\ref{fig:runc}.
+            \item It sits at the core of most container engines as depicted in Figure 1.
         \end{itemize}
     }
 
