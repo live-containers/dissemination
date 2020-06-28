@@ -169,15 +169,16 @@
 
 \begin{frame}
     \frametitle{Background Concepts}
-    \framesubtitle{What is checkpointing and how can we do it?}
+    \framesubtitle{Checkpoint-Restore and Live Migration}
 
-    \vspace{-15pt}
+    \textcolor{blue}{\textbf{Checkpoint-Restore:}}
+    \begin{alertblock}{Definition (Encyclopedia of Parallel Computing)}
+        Checkpointing refers to the ability to store the state of a computation in a way that allows it be continued at a later time without changing the computation's behavior.
+    \end{alertblock}
 
     \begin{columns}[t]
         \begin{column}{.65\textwidth}
-            \textbf{Checkpoint/Restore:}
             \begin{itemize}
-                \item \textbf{\textcolor{blue}{Checkpointing}} is a technique to \textbf{\textcolor{blue}{save}} the state of a running process.
                 \item The \textbf{\textcolor{blue}{state}} is made up of: memory, pipes, sockets, ...
                 \item This state is used to \textbf{\textcolor{blue}{restore}} the process.
                 \item Originated in HPC and popularized through Virtual Machines.
@@ -189,7 +190,7 @@
             \begin{figure}
                 \centering
                 \includegraphics[width=.8\textwidth]{./images/cr.png}
-                \caption{Basic working principle of C/R.}
+                \caption{Basic working principle of live migration.}
             \end{figure}
         \end{column}
     \end{columns}
@@ -198,7 +199,7 @@
 
 \begin{frame}
     \frametitle{Background Concepts}
-    \framesubtitle{How can we checkpoint TCP connections?}
+    \framesubtitle{\textsc{CRIU}: Checkpoint-Restore in Userspace}
 
     \begin{columns}[t]
         \begin{column}{.65\textwidth}
