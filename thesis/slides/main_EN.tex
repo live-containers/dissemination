@@ -47,7 +47,7 @@
 \newcommand{\mainTitle}{Checkpoint/Restore of Established TCP Connections}
 \newcommand{\secondTitle}{Design, Implementation, and Evaluation on runC Containers}
 \subtitle{Decentralized Systems} % leave empty if no subtitle
-\title[C/R of Established TCP Connections] % leave empty for no title in footer
+\title[Live Migration of Containers] % leave empty for no title in footer
     {\normalsize Master in Advanced Mathematics and Mathematical Engineering \\[5pt] \Large Transparent Live Migration of Container \\ \Large Deployments in Userspace}
 \subtitle{Master's Thesis - Oral Deffense} % leave empty if no subtitle
 %\subtitle{Master in Research in Informatics - MIRI}
@@ -93,6 +93,7 @@
 %   2.2. Checkpointing - 1 slide
 %   2.3. CRIU - 1 slide
 % 3. Implementation
+%   3.0. Maybe introduce an introductory slide (?!)
 %   3.1. Design Choices
 %     3.1.1. Diskless Migration - 1 slide
 %     3.1.2. Iterative Migration - 1 slide
@@ -240,73 +241,77 @@
 
     \vspace{10pt}
 
-    \textbf{\textcolor{blue}{We drop packets, but what's the impact on performance?}}
+    \textbf{\textcolor{blue}{How to reduce the impact of file I/O to disk?}}
     \begin{itemize}
-        \item \texttt{iPerf3} client in one VM and \texttt{iPerf3} server in another VM (same LAN).
-        \item \texttt{t=0} start client, \texttt{t=10} dump the server, \texttt{t=12} restore the server.
-        \item One experiment server as standalone process, another one in a container.
+        \item Employ a \emph{diskless} migration $\rightarrow$ Use a \texttt{tmpfs} mount rather than disk.
+        \item Avoid writing files twice (on dump + transfer) $\rightarrow$ Use CRIU's \texttt{page-server}. 
+        \item We compare a small application (100 kB, left) and a big one (1 GB, right).
     \end{itemize}
 
     \vspace{-5pt}
 
     \begin{figure}
         \centering
-        \includegraphics[width=.75\textwidth]{./images/tcp_established_downtime_microbenchmark.pdf}
-        \caption{Throughput from the client as a function of time.\label{fig:evaluation-downtime}}
+        \includegraphics[width=.75\textwidth]{./figs/diskless_migration_microbenchmark.pdf}
+        \caption{Diskless migration micro-benchmark.\label{fig:diskless-microbecnhmark}}
     \end{figure}
     
 \end{frame}
 
 \begin{frame}
-    \frametitle{Evaluation}
-    \framesubtitle{Perceived Throughput by the Client End}
+    \frametitle{Implementation}
+    \framesubtitle{Design Choices: Iterative Migration}
 
     \vspace{10pt}
 
-    \textbf{\textcolor{blue}{How reactive is to sudden changes?}}
+    \textbf{\textcolor{blue}{How to minimize the application's downtime during migration?}}
     \begin{itemize}
-        \item \texttt{t=0} start client, dump server at \texttt{t=6,10,14} restore immediately.
-        \item Where does the difference in downtime comes from?
-        \item We don't know! Hidden caching, TCP's congestion and hold back times, \texttt{iPerf3}'s reactivity, ...
+        \item Perform iterative dumps $\rightarrow$ Use \texttt{pre-dump} and memory tracking
+        \item Ensure freshness upon restore $\rightarrow$ Parent directories linked list
+        \item For each application, we compare a static setting (left) and a dynamic one (right)
     \end{itemize}
 
     \vspace{-5pt}
 
     \begin{figure}
         \centering
-        \includegraphics[width=.75\textwidth]{./images/tcp_established_resolution_microbenchmark.pdf}
-        \caption{Throughput from the client as a function of time.\label{fig:evaluation-downtime}}
+        \includegraphics[width=.75\textwidth]{./figs/iterative_migration_microbenchmark.pdf}
+        \caption{Iterative migration micro-benchmark.\label{fig:iterative-microbecnhmark}}
     \end{figure}
     
 \end{frame}
 
 \begin{frame}
-    \frametitle{Problem}
-    \framesubtitle{How can we ensure that the same IP can be reused?}
+    \frametitle{Implementation}
+    \framesubtitle{Design Choices: Established TCP Connections}
 
     \begin{columns}
-        \begin{column}{.45\textwidth}
-            \textbf{\textcolor{blue}{Restore the same IP in a different environment:}}
+        \begin{column}{.5\textwidth}
+
+            \vspace{-40pt}
+
+            \textbf{\textcolor{blue}{How to migrate established TCP connections?}}
             \begin{itemize}
-                \item Migration within the same machine:
-                \begin{itemize}
-                    \item Use namespaces and virtual Ethernet pairs (Figure \ref{fig:architecture}).
-                    \item Supported by runC containers (use-case particularly suitable).
-                    \item Demonstrated in intermediate results presentation.
-                \end{itemize}
-                \vspace{5pt}
-                \item Migration to a remote machine:
-                \begin{itemize}
-                    \item Two VMs and a third one listening.
-                    \item Manually compress and migrate image files.
-                \end{itemize}
+                \item Rely on \texttt{TCP\_REPAIR} socket option
+                \item Re-create \texttt{iptables} on remote end
+                \item Re-use same IP address:
+                \begin{enumerate}
+                    \item Using network namespaces
+                    \item Using locally scoped addresses
+                \end{enumerate}
+                \item In the experiments we present:
+                \begin{enumerate}
+                    \item Downtime after an extended stop (top)
+                    \item Reactivity to immediate C/R (bottom)
+                \end{enumerate}
             \end{itemize}
         \end{column}
-        \begin{column}{.55\textwidth}
-            \vspace{-20pt}
-            \begin{figure}[t!]
-                \includegraphics[width=.85\textwidth]{./images/architecture.png}
-                \caption{Two different setups for IP reuse.\label{fig:architecture}}
+        \begin{column}{.5\textwidth}
+            \begin{figure}
+                \centering
+                \includegraphics[width=\textwidth]{./figs/tcp_established_downtime_microbenchmark.pdf}
+                \includegraphics[width=\textwidth]{./figs/tcp_established_resolution_microbenchmark.pdf}
+                \caption{TCP connections micro-benchmark.\label{fig:tcp-microbecnhmark}}
             \end{figure}
         \end{column}
     \end{columns}
@@ -314,13 +319,149 @@
 \end{frame}
 
 \begin{frame}
-    \frametitle{Future Work \& Questions}
+    \frametitle{Implementation}
+    \framesubtitle{Putting it all together}
 
-    \textbf{\textcolor{blue}{Work to-do:}}
+    \begin{columns}
+        \begin{column}{.5\textwidth}
+
+            \vspace{-40pt}
+
+            \textbf{\textcolor{blue}{Efficient live migration of running containers:}}
+            \begin{itemize}
+                \item We employ a single process (no listening end on destination)
+                \item We require \texttt{CAP\_SYS\_ADMIN} capabilities
+                \item We make two important assumptions:
+                \begin{enumerate}
+                    \item The OCI bundle is available on destination
+                    \item The user has SSH access to both machines 
+                \end{enumerate}
+                \item To run with default parameters we require:
+                \begin{enumerate}
+                    \item A running \texttt{runC} container's name
+                    \item An IP address where to migrate it
+                \end{enumerate}
+            \end{itemize}
+        \end{column}
+        \begin{column}{.5\textwidth}
+            \begin{algorithm2e}[H]
+                \SetAlgoLined
+                \While{size\_to\_xfer > MEMORY\_THRESHOLD}{
+                    prepare\_migration()\;
+                    start\_page\_server()\;
+                    pre\_dump()\; 
+                    transfer\_intermediate\_files()\;
+                    link\_directories()\;
+                }
+                start\_page\_server()\;
+                dump()\;
+                transfer\_files()\;
+                restore\_on\_remote()\;
+                \caption{Main migration loop.}
+            \end{algorithm2e}
+        \end{column}
+    \end{columns}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Evaluation}
+    \framesubtitle{Application Downtime}
+
+    \vspace{10pt}
+
+    \textbf{\textcolor{blue}{Impact of the threshold value in total downtime:}}
     \begin{itemize}
-        \item Remote migration with containers still not working.
-        \item Once it does, have a similar evaluation comparing CRIU and runC.
+        \item Downtime (time container is unresponsive) is the key metric of success in live migration.
+        \item The \texttt{MEMORY\_THRESHOLD} becomes then a decisive design parameter.
+        \item We present a macro-benchmark, studying it's impact on downtime.
     \end{itemize}
+
+    \vspace{-5pt}
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=.75\textwidth]{./figs/downtime.pdf}
+        \caption{Application downtime macro-benchmark.\label{fig:diskless-microbecnhmark}}
+    \end{figure}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Evaluation}
+    \framesubtitle{Comparison w/ Other Techniques}
+
+    \begin{columns}
+        \begin{column}{.5\textwidth}
+
+            \vspace{-40pt}
+
+            \textbf{\textcolor{blue}{Comparison with other migration techniques:}}
+            \begin{itemize}
+                \item We compare our performance with two different settings:
+                \begin{enumerate}
+                    \item Naive migration: dump-transfer-restore
+                    \item VM live migration: using VirtualBox's teleport
+                \end{enumerate}
+                \item We measure:
+                \begin{enumerate}
+                    \item Scalability regarding the container's memory size
+                    \item Overall time elapsed (and breakdown)
+                \end{enumerate}
+                \item We conclude:
+                \begin{enumerate}
+                    \item Higher baseline than naive due to increased set-up.
+                    \item $\times 1.5$ slowdown \textit{vs.} $\times 2$ for VM and $\times 10$ for naive.
+                \end{enumerate}
+            \end{itemize}
+        \end{column}
+        \begin{column}{.5\textwidth}
+            \begin{figure}
+                \centering
+                \includegraphics[width=\textwidth]{./figs/key_scalability.pdf}
+                \includegraphics[width=\textwidth]{./figs/vm_teleport.pdf}
+                \caption{Comparison w/ naive migration and VM migration.\label{fig:tcp-microbecnhmark}}
+            \end{figure}
+        \end{column}
+    \end{columns}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Conclusions \& Future Work}
+
+    \textbf{\textcolor{blue}{Conclusions}}
+    \begin{itemize}
+        \item[\textcolor{blue}{\textbf{+}}] Implemented an easy-to-use efficient solution.
+        \item[\textcolor{blue}{\textbf{+}}] Has minimal dependencies and requires minimal set-up.
+        \item[\textcolor{blue}{\textbf{-}}] Limited comparison against other solutions (several dependencies and hard to set-up).
+        \item[\textcolor{blue}{\textbf{-}}] Implementation does not support all features initially planned.
+    \end{itemize}
+
+    \vspace{10pt}
+
+    \textbf{\textcolor{blue}{To-Do List}}
+    \begin{itemize}
+        \item Technical Details: upon completion we plan on submitting to a specialized conference.
+        \begin{enumerate}
+            \item Evaluate against other live migration solutions for containers (\textit{e.g.} \texttt{P.Haul})
+            \item Evaluation against other VM migration tools (\textit{e.g.} \texttt{KVM}'s or \texttt{LXC}'s)
+            \item Circumvent the pre-existance requirement for OCI bundles $\rightarrow$ Generate during \texttt{pre-dump} phase.
+        \end{enumerate}
+        \item Future lines of work:
+        \begin{enumerate}
+            \item Initial goal was to support migration of distributed deployments.
+            \begin{enumerate}
+                \item Implement distributed checkpointing algorithms.
+                \item Integrate with container orchestrators.
+            \end{enumerate}
+        \end{enumerate}
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+    \frametitle{Questions \& Discussion}
 
     \vspace{15pt}
 
