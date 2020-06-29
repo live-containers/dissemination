@@ -124,7 +124,7 @@
         \end{column}\hspace{-5cm}
         \begin{column}{.7\textwidth}
             \begin{alertblock}{Main Goal}
-                Design, implement, and evaluate a tool for efficient live migration of running containers using CRIU.
+                Design, implement, and evaluate a tool for efficient live migration of running containers using \textbf{CRIU} and \textbf{runC}.
             \end{alertblock}\hfill
         \end{column}
     \end{columns}
@@ -182,7 +182,7 @@
                 \item The \textbf{\textcolor{blue}{state}} is made up of: memory, pipes, sockets, ...
                 \item This state is used to \textbf{\textcolor{blue}{restore}} the process.
                 \item Originated in HPC and popularized through Virtual Machines.
-                \item \textbf{\textcolor{blue}{CRIU (Checkpoint/Restore in Userspace)}} is a tool to perform C/R from userspace transparently to the user.
+                \item \textbf{\textcolor{blue}{Live migration}} consists in checkpointing in an environment, and restoring in a different one.
             \end{itemize}
         \end{column}\hfill
         \begin{column}{.35\textwidth}
