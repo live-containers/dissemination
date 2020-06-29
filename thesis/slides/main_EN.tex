@@ -176,6 +176,7 @@
         Checkpointing refers to the ability to store the state of a computation in a way that allows it be continued at a later time without changing the computation's behavior.
     \end{alertblock}
 
+    \vspace{-10pt}
     \begin{columns}[t]
         \begin{column}{.65\textwidth}
             \begin{itemize}
@@ -186,10 +187,9 @@
             \end{itemize}
         \end{column}\hfill
         \begin{column}{.35\textwidth}
-            \vspace{-18pt}
             \begin{figure}
                 \centering
-                \includegraphics[width=.8\textwidth]{./images/cr.png}
+                \includegraphics[width=.7\textwidth]{./images/cr.png}
                 \caption{Basic working principle of live migration.}
             \end{figure}
         \end{column}
@@ -202,49 +202,33 @@
     \framesubtitle{\textsc{CRIU}: Checkpoint-Restore in Userspace}
 
     \begin{columns}[t]
-        \begin{column}{.65\textwidth}
-            \textbf{\textcolor{blue}{Checkpoint/Restore of Unix sockets:}} 
+        \begin{column}{.5\textwidth}
+            \textbf{\textcolor{blue}{CRIU:}} Checkpoint-Restore in Userspace 
             \begin{itemize}
                 \item We rely on \textbf{\textcolor{blue}{CRIU}} to perform C/R from userspace, \textbf{\textcolor{blue}{transparently}} to the user.
-                \item To \textbf{\textcolor{blue}{checkpoint}}, CRIU gathers information from FDT and dumps the content.
-                \item To \textbf{\textcolor{blue}{restore}}, it depends on the socket state:
-                \begin{itemize}
-                    \item \texttt{LISTEN}: restore as any other file.
-                    \item \texttt{CONNECTED}:
-                    \begin{enumerate}
-                        \item Establish a listening anon. socket.
-                        \item Create a socket at the desired FD (dumped one).
-                        \item Connect to the fake end and call \texttt{dup2}.
-                    \end{enumerate}
-                \end{itemize}
-            \item We need to bind to the \textbf{\textcolor{blue}{same}} IP address.
-            \item Inbound packets are dropped by the netfilter in Table~\ref{table:filter}.
+                \item It is an open-source, community-driven project.
+                \item To \textbf{\textcolor{blue}{checkpoint}}, CRIU gathers information from different resources and dumps the content to files.
+                \item To \textbf{\textcolor{blue}{restore}}, it morphs itself into the to-be restored process.
             \end{itemize}
         \end{column}
-        \begin{column}{.40\textwidth}
-            \vspace{-18pt}
+        \begin{column}{.50\textwidth}
+            %\vspace{-18pt}
             \begin{table}
                 \centering
-                {\ttfamily \scriptsize
-                \begin{tabular}{p{0.7cm}p{0.3cm}p{0.3cm}p{0.5cm}p{0.5cm}p{1.2cm}}
-                    \multicolumn{6}{l}{Chain INPUT (policy ACCEPT)} \\
-                    target & prot & opt & source & dest & \\
-                    CRIU & all & -- & .../0 & .../0 & \\
-                    & & & & & \\
-                    \multicolumn{6}{l}{Chain FORWARD (policy ACCEPT)} \\
-                    target & prot & opt & source & dest & \\
-                    & & & & & \\
-                    \multicolumn{6}{l}{Chain OUTPUT (policy ACCEPT)} \\
-                    target & prot & opt & source & dest & \\
-                    CRIU & all & -- & .../0 & .../0 & \\
-                    & & & & & \\
-                    \multicolumn{6}{l}{Chain CRIU} \\
-                    target & prot & opt & source & dest & \\
-                    ACCEPT & all & -- & .../0 & .../0 & mark 0xc1 \\
-                    DROP & all & -- & .../0 & .../0 & \\
+                \rowcolors{1}{blue!10}{}
+                {\scriptsize
+                \begin{tabular}{p{1.7cm}p{1.1cm}p{1.1cm}p{1.1cm}}
+                    \rowcolor{blue!50} \hline & \textbf{CRIU} & \textbf{DMTCP} & \textbf{BLCR} \\[3pt]
+                    \hline \hline \textbf{Target App.} & Containers & HPC & HPC \\[3pt]
+                    \textbf{Standard Kernel} & $>$ \texttt{3.11} & Yes & Yes \\[3pt]
+                    \textbf{Transparency} &  Full & Pre-Load & Pre-Load \\[3pt]
+                    \textbf{Unmodified App.} & Yes & Yes & No \\[3pt]
+                    \textbf{Containers} & Yes & No & No \\[3pt]
+                    \textbf{Distributed App.} & No & Yes & Yes \\[3pt]
+                    \textbf{Open Files} & Yes & No & No \\[3pt] \hline
                 \end{tabular}
                 }
-                \caption{Output of running \texttt{iptables -t filter -L -n}.\label{table:filter}}.
+                \caption{Comparison with other popular C/R tools.\label{table:filter}}.
             \end{table}
         \end{column}
     \end{columns}
