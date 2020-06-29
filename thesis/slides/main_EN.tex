@@ -125,7 +125,7 @@
         \end{column}\hspace{-5cm}
         \begin{column}{.7\textwidth}
             \begin{alertblock}{Main Goal}
-                Design, implement, and evaluate a tool for efficient live migration of running containers using \textbf{CRIU} and \textbf{runC}.
+                Design, implement, and evaluate a tool for efficient live migration of running runC containers using \textbf{CRIU}.
             \end{alertblock}\hfill
         \end{column}
     \end{columns}
@@ -144,9 +144,9 @@
             A linux container is a set of processes isolated from the rest of the system.
         \end{alertblock}
         \begin{itemize}
-            \item They rely on \textbf{\textcolor{blue}{namespaces}} and \textbf{\textcolor{blue}{control groups}} for fine-grained resource control.
-            \item A \textbf{\textcolor{blue}{container engine}} transforms a \emph{container image} into a running process relying on a chosen \emph{runtime}.
-            \item Some well-known container engines are \textsc{Docker}, \textsc{Podman}, and \textsc{Cri-O}.
+            \item Containers rely on \textbf{\textcolor{blue}{namespaces}} and \textbf{\textcolor{blue}{control groups}} for fine-grained resource control.
+            \item A \textbf{\textcolor{blue}{container engine}} transforms a \emph{container image} into a process by means of a \emph{runtime}.
+            \item We choose \texttt{runC} as our container runtime as it has the best integration with CRIU.
         \end{itemize}
     }
 
@@ -207,9 +207,9 @@
             \textbf{\textcolor{blue}{CRIU:}} Checkpoint-Restore in Userspace 
             \begin{itemize}
                 \item We rely on \textbf{\textcolor{blue}{CRIU}} to perform C/R from userspace, \textbf{\textcolor{blue}{transparently}} to the user.
-                \item It is an open-source, community-driven project.
                 \item To \textbf{\textcolor{blue}{checkpoint}}, CRIU gathers information from different resources and dumps the content to files.
                 \item To \textbf{\textcolor{blue}{restore}}, it morphs itself into the to-be restored process.
+                \item To perform \textbf{\textcolor{blue}{live migration}}, several factors must be considered.
             \end{itemize}
         \end{column}
         \begin{column}{.50\textwidth}
@@ -266,9 +266,9 @@
 
     \textbf{\textcolor{blue}{How to minimize the application's downtime during migration?}}
     \begin{itemize}
-        \item Perform iterative dumps $\rightarrow$ Use \texttt{pre-dump} and memory tracking
-        \item Ensure freshness upon restore $\rightarrow$ Parent directories linked list
-        \item For each application, we compare a static setting (left) and a dynamic one (right)
+        \item Perform iterative dumps $\rightarrow$ Use \texttt{pre-dump} and memory tracking.
+        \item Ensure freshness upon restore $\rightarrow$ Parent directories linked list.
+        \item For each application, we compare a static setting (left) and a dynamic one (right).
     \end{itemize}
 
     \vspace{-5pt}
@@ -292,17 +292,17 @@
 
             \textbf{\textcolor{blue}{How to migrate established TCP connections?}}
             \begin{itemize}
-                \item Rely on \texttt{TCP\_REPAIR} socket option
-                \item Re-create \texttt{iptables} on remote end
+                \item Rely on \texttt{TCP\_REPAIR} socket option.
+                \item Re-create \texttt{iptables} on remote end.
                 \item Re-use same IP address:
                 \begin{enumerate}
-                    \item Using network namespaces
-                    \item Using locally scoped addresses
+                    \item Using network namespaces.\\[3pt]
+                    \item Using locally scoped addresses.
                 \end{enumerate}
                 \item In the experiments we present:
                 \begin{enumerate}
-                    \item Downtime after an extended stop (top)
-                    \item Reactivity to immediate C/R (bottom)
+                    \item Downtime after an extended stop (top).\\[3pt]
+                    \item Reactivity to immediate C/R (bottom).
                 \end{enumerate}
             \end{itemize}
         \end{column}
@@ -329,17 +329,17 @@
 
             \textbf{\textcolor{blue}{Efficient live migration of running containers:}}
             \begin{itemize}
-                \item We employ a single process (no listening end on destination)
-                \item We require \texttt{CAP\_SYS\_ADMIN} capabilities
+                \item We employ a single process (no listening daemon on destination).
+                \item We require \texttt{CAP\_SYS\_ADMIN} capabilities.
                 \item We make two important assumptions:
                 \begin{enumerate}
-                    \item The OCI bundle is available on destination
-                    \item The user has SSH access to both machines 
+                    \item The OCI bundle is available on destination.\\[3pt]
+                    \item The user has SSH access to both machines.
                 \end{enumerate}
                 \item To run with default parameters we require:
                 \begin{enumerate}
-                    \item A running \texttt{runC} container's name
-                    \item An IP address where to migrate it
+                    \item A running \texttt{runC} container's name.\\[3pt]
+                    \item An IP address where to migrate it.
                 \end{enumerate}
             \end{itemize}
         \end{column}
@@ -372,8 +372,8 @@
 
     \textbf{\textcolor{blue}{Impact of the threshold value in total downtime:}}
     \begin{itemize}
-        \item Downtime (time container is unresponsive) is the key metric of success in live migration.
-        \item The \texttt{MEMORY\_THRESHOLD} becomes then a decisive design parameter.
+        \item \textcolor{blue}{\textbf{Downtime}} (time container is unresponsive) is the key metric of success in live migration.
+        \item The \texttt{MEMORY\_THRESHOLD} becomes a decisive design parameter.
         \item We present a macro-benchmark, studying it's impact on downtime.
     \end{itemize}
 
@@ -400,17 +400,17 @@
             \begin{itemize}
                 \item We compare our performance with two different settings:
                 \begin{enumerate}
-                    \item Naive migration: dump-transfer-restore
-                    \item VM live migration: using VirtualBox's teleport
+                    \item Naive migration: dump-transfer-restore.\\[3pt]
+                    \item VM live migration: using VirtualBox's teleport.
                 \end{enumerate}
                 \item We measure:
                 \begin{enumerate}
-                    \item Scalability regarding the container's memory size
-                    \item Overall time elapsed (and breakdown)
+                    \item Scalability regarding the container's memory size.\\[3pt]
+                    \item Overall time elapsed (and breakdown).
                 \end{enumerate}
                 \item We conclude:
                 \begin{enumerate}
-                    \item Higher baseline than naive due to increased set-up.
+                    \item Higher baseline than naive due to increased set-up.\\[3pt]
                     \item $\times 1.5$ slowdown \textit{vs.} $\times 2$ for VM and $\times 10$ for naive.
                 \end{enumerate}
             \end{itemize}
@@ -438,21 +438,19 @@
         \item[\textcolor{blue}{\textbf{-}}] Implementation does not support all features initially planned.
     \end{itemize}
 
-    \vspace{10pt}
-
     \textbf{\textcolor{blue}{To-Do List}}
     \begin{itemize}
         \item Technical Details: upon completion we plan on submitting to a specialized conference.
         \begin{enumerate}
-            \item Evaluate against other live migration solutions for containers (\textit{e.g.} \texttt{P.Haul})
-            \item Evaluation against other VM migration tools (\textit{e.g.} \texttt{KVM}'s or \texttt{LXC}'s)
-            \item Circumvent the pre-existance requirement for OCI bundles $\rightarrow$ Generate during \texttt{pre-dump} phase.
+            \item Evaluate against other live migration solutions for containers (\textit{e.g.} \texttt{P.Haul}).\\[3pt]
+            \item Evaluation against other VM migration tools (\textit{e.g.} \texttt{KVM}'s or \texttt{LXC}'s).\\[3pt]
+            \item Circumvent the pre-existance requirement for OCI bundles $\rightarrow$ Generate during \texttt{pre-dump} phase.\\[3pt]
         \end{enumerate}
         \item Future lines of work:
         \begin{enumerate}
             \item Initial goal was to support migration of distributed deployments.
             \begin{enumerate}
-                \item Implement distributed checkpointing algorithms.
+                \item Implement distributed checkpointing algorithms.\\[3pt]
                 \item Integrate with container orchestrators.
             \end{enumerate}
         \end{enumerate}
