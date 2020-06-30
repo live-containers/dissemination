@@ -49,7 +49,7 @@
 \subtitle{Decentralized Systems} % leave empty if no subtitle
 \title[Live Migration of Containers] % leave empty for no title in footer
     {\normalsize Master in Advanced Mathematics and Mathematical Engineering \\[5pt] \Large Transparent Live Migration of Container \\ \Large Deployments in Userspace}
-\subtitle{Master's Thesis - Oral Deffense} % leave empty if no subtitle
+\subtitle{Master's Thesis - Oral Defense} % leave empty if no subtitle
 %\subtitle{Master in Research in Informatics - MIRI}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % date of the presentation (leave empty for no date, default is today)
@@ -108,9 +108,28 @@
   \titlepage
 \end{frame}
 
+\begin{frame}{Session Outline}
+    \begin{columns}[T,onlytextwidth]
+        \hspace{1.25cm}
+        \begin{column}{.4\textwidth}
+            \tableofcontents[sections={1-2}]
+    %        [hideallsubsections] % un-comment this line to hide sub-sections
+        \end{column}
+        \hspace*{-3.25cm}
+        \begin{column}{.4\textwidth}
+            \tableofcontents[sections={3-5}]
+    %        [hideallsubsections] % un-comment this line to hide sub-sections
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\section{Introduction}
+
+\subsection{Motivation \& Main Goal}
+
 \begin{frame}
     \frametitle{Introduction}
-    \framesubtitle{Framing the Work}
+    \framesubtitle{Motivation \& Main Goal}
 
     \textbf{\textcolor{blue}{Problem Motivation:}}
     \begin{itemize}
@@ -131,6 +150,47 @@
     \end{columns}
 
 \end{frame}
+
+\subsection{Contributions List}
+
+\begin{frame}
+    \frametitle{Introduction}
+    \framesubtitle{Current Limitations \& Contributions List}
+
+    \vspace{-10pt}
+
+    \begin{columns}[T]
+        \begin{column}{.5\textwidth}
+            \textbf{\textcolor{blue}{Current limitations:}}
+            \begin{itemize}
+                \item Limited integration of C/R within container engines (none in terms of live migration).
+                \item VMs are losing ground to containers, yet no replacement for VM migration tools.
+                \item Existing third-party libraries have a lot of dependencies and complex set up.
+            \end{itemize}
+            \textbf{\textcolor{blue}{Main Objectives:}}
+            \begin{itemize}
+                \item Implement a fully-featured container migration tool.
+                \item Support network and memory intensive containers.
+            \end{itemize}
+        \end{column}
+        \begin{column}{.5\textwidth}
+            \begin{alertblock}{Contributions List}
+                \begin{enumerate}
+                    \item An exhaustive micro-benchmark of different CRIU functionalities.
+                    \item An open-source library for live migration of runC containers using CRIU.
+                    \item An easy-to-use binary to transparently migrate containers.
+                    \item A comparison of our solution with traditional VM migration.
+                \end{enumerate}
+            \end{alertblock}\hfill
+        \end{column}
+    \end{columns}
+
+\end{frame}
+
+
+\section{Background Concepts}
+
+\subsection{Containers and runC}
 
 \begin{frame}
     \frametitle{Background Concepts}
@@ -168,6 +228,8 @@
 
 \end{frame}
 
+\subsection{Checkpoint-Restore and Live Migration}
+
 \begin{frame}
     \frametitle{Background Concepts}
     \framesubtitle{Checkpoint-Restore and Live Migration}
@@ -183,8 +245,8 @@
             \begin{itemize}
                 \item The \textbf{\textcolor{blue}{state}} is made up of: memory, pipes, sockets, ...
                 \item This state is used to \textbf{\textcolor{blue}{restore}} the process.
-                \item Originated in HPC and popularized through Virtual Machines.
-                \item \textbf{\textcolor{blue}{Live migration}} consists in checkpointing in an environment, and restoring in a different one.
+                \item Originated in HPC and popularized through VMs.
+                \item \textbf{\textcolor{blue}{Live migration}} consists in checkpointing in an environment, and restoring in a different one, \textcolor{blue}{\textbf{without affecting the application's availability}}.
             \end{itemize}
         \end{column}\hfill
         \begin{column}{.35\textwidth}
@@ -198,6 +260,8 @@
 
 \end{frame}
 
+\subsection{\textsc{CRIU}: Checkpoint-Restore in Userspace}
+
 \begin{frame}
     \frametitle{Background Concepts}
     \framesubtitle{\textsc{CRIU}: Checkpoint-Restore in Userspace}
@@ -209,7 +273,7 @@
                 \item We rely on \textbf{\textcolor{blue}{CRIU}} to perform C/R from userspace, \textbf{\textcolor{blue}{transparently}} to the user.
                 \item To \textbf{\textcolor{blue}{checkpoint}}, CRIU gathers information from different resources and dumps the content to files.
                 \item To \textbf{\textcolor{blue}{restore}}, it morphs itself into the to-be restored process.
-                \item To perform \textbf{\textcolor{blue}{live migration}}, several factors must be considered.
+                \item To achieve \textbf{\textcolor{blue}{efficient live migration}}, several design choices must be made.
             \end{itemize}
         \end{column}
         \begin{column}{.50\textwidth}
@@ -235,6 +299,10 @@
     \end{columns}
 \end{frame}
 
+\section{Implementation}
+
+\subsection{Diskless Migration}
+
 \begin{frame}
     \frametitle{Implementation}
     \framesubtitle{Design Choices: Diskless Migration}
@@ -243,8 +311,8 @@
 
     \textbf{\textcolor{blue}{How to reduce the impact of file I/O to disk?}}
     \begin{itemize}
-        \item Employ a \emph{diskless} migration $\rightarrow$ Use a \texttt{tmpfs} mount rather than disk.
         \item Avoid writing files twice (on dump + transfer) $\rightarrow$ Use CRIU's \texttt{page-server}. 
+        \item Avoid writing to disk at all $\rightarrow$ Use a \texttt{tmpfs} mount rather than disk.
         \item We compare a small application (100 kB, left) and a big one (1 GB, right).
     \end{itemize}
 
@@ -258,6 +326,8 @@
     
 \end{frame}
 
+\subsection{Iterative Migration}
+
 \begin{frame}
     \frametitle{Implementation}
     \framesubtitle{Design Choices: Iterative Migration}
@@ -268,7 +338,7 @@
     \begin{itemize}
         \item Perform iterative dumps $\rightarrow$ Use \texttt{pre-dump} and memory tracking.
         \item Ensure freshness upon restore $\rightarrow$ Parent directories linked list.
-        \item For each application, we compare a static setting (left) and a dynamic one (right).
+        \item For each app, we compare a setting w/out memory changes (left) and one with (right).
     \end{itemize}
 
     \vspace{-5pt}
@@ -280,6 +350,8 @@
     \end{figure}
     
 \end{frame}
+
+\subsection{Established TCP Connections}
 
 \begin{frame}
     \frametitle{Implementation}
@@ -317,6 +389,8 @@
     \end{columns}
     
 \end{frame}
+
+\subsection{Putting it All Together}
 
 \begin{frame}
     \frametitle{Implementation}
@@ -364,6 +438,10 @@
     
 \end{frame}
 
+\section{Evalutaion}
+
+\subsection{Application Downtime}
+
 \begin{frame}
     \frametitle{Evaluation}
     \framesubtitle{Application Downtime}
@@ -374,7 +452,7 @@
     \begin{itemize}
         \item \textcolor{blue}{\textbf{Downtime}} (time container is unresponsive) is the key metric of success in live migration.
         \item The \texttt{MEMORY\_THRESHOLD} becomes a decisive design parameter.
-        \item We present a macro-benchmark, studying it's impact on downtime.
+        \item We study it's impact on downtime when migrating a Redis in-memory DB.
     \end{itemize}
 
     \vspace{-5pt}
@@ -386,6 +464,8 @@
     \end{figure}
     
 \end{frame}
+
+\subsection{Comparison with Other Tools}
 
 \begin{frame}
     \frametitle{Evaluation}
@@ -426,6 +506,8 @@
     \end{columns}
     
 \end{frame}
+
+\section{Conclusions \& Future Work}
 
 \begin{frame}
     \frametitle{Conclusions \& Future Work}
