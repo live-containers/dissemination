@@ -134,7 +134,7 @@
     \textbf{\textcolor{blue}{Problem Motivation:}}
     \begin{itemize}
         \item \textbf{\textcolor{blue}{Containers}} have become the go-to alternative for sandboxing and deploying distributed applications, they build on the concept of \textbf{\textcolor{blue}{namespaces}}.
-        \item \href{https://en.wikipedia.org/wiki/Application_checkpointing}{Checkpointing} provides systems with \textbf{\textcolor{blue}{fault-tolerance}} and \textbf{\textcolor{blue}{state consistency}} enabling rollback and restore from previous stable versions.
+        \item \textbf{\textcolor{blue}{Checkpointing}} provides systems with \textbf{\textcolor{blue}{fault-tolerance}} and \textbf{\textcolor{blue}{state consistency}} enabling rollback and restore from previous stable versions.
         \item \textbf{\textcolor{blue}{Checkpoint-Restore in Userspace (CRIU)}} is a tool to perform checkpoint-restore of processes, transparently to the user.
         \item \textbf{\textcolor{blue}{Live migration}} consists in transparently relocating running services for improved resource-management and increased QoS.
     \end{itemize}
@@ -213,7 +213,7 @@
     \only<1-2>{
         \textbf{\textcolor{blue}{Introduction to runC:}}
         \begin{itemize}
-            \item \textbf{\textcolor{blue}{runc}} is the Open Container Initiative's (OCI) reference runtime implementation.
+            \item \textbf{\textcolor{blue}{runC}} is the Open Container Initiative's (OCI) reference runtime implementation.
             \item Rather than \textbf{\textcolor{blue}{images}}, it relies on OCI bundles: \texttt{config.json} + \texttt{rootfs}.
             \item It sits at the core of most container engines as depicted in Figure 1.
         \end{itemize}
