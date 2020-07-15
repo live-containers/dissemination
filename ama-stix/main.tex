@@ -1,9 +1,13 @@
 \documentclass[AMA,STIX1COL]{WileyNJD-v2}
 \usepackage{moreverb}
 
+\usepackage{xspace}
 
 \newcommand\BibTeX{{\rmfamily B\kern-.05em \textsc{i\kern-.025em b}\kern-.08em
 T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\newcommand{\criu}{\textsc{CRIU}\xspace}
+\newcommand{\redis}{\textsc{Redis}\xspace}
+\newcommand{\runc}{\texttt{runC}\xspace}
 
 \articletype{Experience Report}%
 
@@ -32,10 +36,27 @@ T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
 \presentaddress{Present address}
 
-\abstract[Abstract]{This paper describes the use of the \LaTeXe\ \textsf{WileyNJD-v2.cls}
-class file for setting papers for \emph{Mathematical Methods in the Applied Sciences}.}
+\abstract[Abstract]{
+class file for setting papers for \emph{Mathematical Methods in the Applied Sciences}.
+Containers have become the go-to technology for managing application's lifecycle in the cloud.
+As a consequence, cloud-tenants are becoming increasingly interested in advanced load-balancing strategies to optimize resource usage and guarantee good quality of service.
+Live migration is a technique to halt the execution of a program and resume it in the same state in a different location without disrupting the program's availability.
+It relies on checkpoint-restore tools to snapshot an application's state.
+Checkpoint-Restore in Userspace (CRIU) is one of such tools, designed to work transparently to the user, entirely from userspace, and specialized for containers.
 
-\keywords{Class file; \LaTeXe; \emph{Wiley NJD}}
+In this Master thesis we present a tool to perform live migration of \runc containers using \criu.
+Our solution is efficient in terms of resource utilization, memory and disk, and minimizes downtime when compared to naive migration through checkpoint-transfer-restore and native virtual machine (VM) migration.
+We also provide support to checkpoint memory and network intensive containers with established TCP connections and external namespaces.
+The implementation is accompanied by a thorough background research, together with a set of micro benchmarks to justify each of our design choices.
+It is open sourced and available in the project's repository.
+
+Our evaluation results show that, by adding a very small overhead ($0.1$s to the baseline of checkpoint-transfer-restore) we improve scalability with regard to allocated memory by a factor of 10.
+Additionally, all our results are an order of magnitude faster than traditional virtual machine migration.
+Lastly, our benchmarking of network intensive server-side application's migration reported a $< 0.1$s throughput downtime, negligible with more moderate workloads.
+As a consequence, we believe our migration technique for \criu and \runc is a feasible replacement for VM migration and, as the technology matures, will be ready for deployment in production.
+}
+
+\keywords{checkpoint, restore, live migration, CRIU, runc, container, load-balancing}
 
 \jnlcitation{\cname{%
 \author{Williams K.}, 
