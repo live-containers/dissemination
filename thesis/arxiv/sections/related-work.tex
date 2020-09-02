@@ -1,0 +1,106 @@
+\chapter{Related Work} \label{chap:related-work}
+
+In this chapter we introduce the most relevant pieces of related work we have based our work on, together with similar approaches to tackle live migration of processes or containers.
+We also include, given the educational nature of this work, references on the bibliography we have based our claims on, together with the materials used throughout our learning process as we understand it is relevant in the frame of a Master's thesis.
+
+\section{Containers: Overview, Internals, and Terminology} \label{sec:rw-cont}
+
+The main goal of this work is to perform efficient live migration of running containers.
+As a consequence, understanding the working principles of the latter is of prominent importance.
+Nowadays, there are dozens of articles covering containers available online but most either confuse general concepts with particular implementations or misuse terminology.
+The first problem becomes apparent when, given the widespread use of \texttt{Docker} as a container engine, one can wrongly assume that \textsc{Docker} containers are the only sort of containers.
+The second one stems from the fact that containers are a relatively new technology (less than 10 years of usage) and their governing body (Open Container Initiative, OCI) is still in the process of establishing itself.
+As a consequence there is a lack of formalism in the definition of terms like: \textit{container}, \textit{container image}, \textit{container registry}, among several others.
+
+A great article from 2018 by McCarty~\cite{McCarty2018} published in the RedHat blog aims to provide OCI-based definitions on terms like: \textit{container}, \textit{image}, \textit{image layer}, \textit{tag}, \textit{base image}, and \textit{layer}.
+It also covers different container engines and container runtimes.
+Fortunately, there's already much more to that than \texttt{Docker} and \texttt{runc}.
+For a technical introduction to the working principles of containers (namely namespaces) we have leveraged a series of articles on LWN by Michael Kerrisk~\cite{Kerrisk2013}.
+They first cover the patch history of different namespaces right at the same time user's namespaces where merged into the mainline kernel (Linux 3.8).
+Then, it introduces the different namespaces available to that date: mount namespaces, UTS namespaces, IPC namespaces, PID namespaces, network namespaces, and user namespaces.
+To each one of these, the author also devotes a complete article and includes snippets to give practical examples of different use cases.
+
+Whenever we deal with system-related tools or calls, the manual pages themselves offer great resources of information, albeit sometimes quite advanced.
+In particular, we make use of and cite the manual pages for namespaces~\cite{namespaces-manual}, the \texttt{clone} system call~\cite{clone-manual} and the \texttt{setns} one~\cite{setns-manual}.
+Lastly, for both namespaces and control groups we have also used a set of slides on \textit{Process Virtualization} from the \textit{Operating Systems} course of the Master in Innovation and Research in Informatics (MIRI) from the Technical University of Catalonia.
+The contents of this course are not available for open distribution and were crafted by the course instructor, Jordi Guitart, who is at the same time the advisor for this work.
+
+With regard to \runc, the OCI reference implementation of a container runtime, we would highly recommend the introductory post by Solomon Hykes, \texttt{Docker}'s founder and former CEO.
+\runc was originally a proprietary component of the \texttt{Docker}'s stack, but was open-sourced in 2015 and donated to the Open Container Initiative.
+In this article, Hykes introduces what exactly is \runc, the motivation behind it and the new governance model.
+The project is very active on GitHub~\cite{runc-memtrack}, and the different issues there posted together with the available documentation (from the repository itself) are the best source of information for the project.
+Lastly, \runc is on track  with the OCI container runtime specification, which is also available on GitHub~\cite{runc-spec}.
+
+\section{Checkpoint Restore and \criu} \label{sec:rw-criu}
+
+Checkpoint-Restore being a technique (application checkpointing) rather than a tool, makes the topic that much vague for its research.
+A good starting point is the definition in the Encyclopedia of Parallel Computing~\cite{Schulz2011}.
+We have also greatly leveraged a set of slides by Brandon Barker from Cornell University~\cite{Barker2014}.
+There, the author does a non-scientific introduction and motivation for C/R, and goes on to cover the different available tools as of December 2014.
+Albeit slightly old, most of the works he cites (DMTCP, \criu, and BLCR) are still the \textit{de facto} alternatives when doing application checkpointing.
+The author's approach is biased towards high performance computing, where DMTCP~\cite{dmtcp} is the usual software of choice, but it does a great job at pointing out the differences between each solution.
+For a detailed survey on the origins of C/R in the context of rollback recovery strategies for fault-tolerant systems, we highlight the work by Elnozahy \textit{et al.} from 2002~\cite{Elnozahy2002}.
+The techniques there described started gaining traction with Virtual Machine's migration, a topic for which Clark's survey is also a great source of information~\cite{Clark2005}.
+
+We chose to use \criu as our C/R tool, as it was the most suitable one in the container scenario, and was already used by the major container engines and runtimes (although with different degrees of integration and active maintenance).
+Checkpoint-Restore in Userspace~\cite{criu-main-page} is an open-source community-driven project.
+Therefore, it has a very actively maintained wiki covering all related topics.
+An exhaustive list of these topics is also available~\cite{criu-all}.
+Adrian Reber is a maintainer of the project in charge of, among others, part of the integration with \runc, and has a set of very interesting an easy-to-follow articles on \criu.
+The earliest ones from 2016 cover the tool as a whole~\cite{Reber2016}, and different types of available migrations~\cite{Reber2016b}.
+One of the most delicate parts of process restore is how to handle old, new, and dependent process identifiers (PIDs).
+Reber also has an article describing how this is done in \criu~\cite{Reber2019}.
+For our technical dive on the tool's internals in \S\ref{chap:background}, we relied mostly on the wiki articles.
+In particular we would like to highlight the one covering checkpoint-restore in a broad sense~\cite{criu-checkpoint}.
+From it, the reader can easily jump to other linked articles if needed.
+We also read in detail the articles covering diskless migration~\cite{criu-diskless}, live migration~\cite{criu-live-migration}, and the memory tracking ones both in the wiki~\cite{criu-memory-tracking} and in LWN~\cite{criu-memory-tracking-lwn}.
+Lastly, for the C/R of established TCP connections, we highly recommend the article by Corbet from 2012~\cite{Corbet12}, as it covers everything one needs to know to understand the approach followed in \criu.
+
+When comparing different C/R tools, and in addition to the previously mentioned work by Barker~\cite{Barker2014}, \criu's developers themselves maintain a comparative table where they list the pro's and con's of each different tool~\cite{criu-comparison} (namely \criu, DMTCP, and BLCR).
+In spite of the natural bias they may have, the resource has plenty of detail and is of great use.
+The main alternative to \criu for C/R is the Distributed-MultiThreaded Checkpointing project~\cite{Ansel2009} (DMTCP).
+Developed under the supervision of professor Gene Cooperman from Northeastern University, the project has a long-standing record of successes in the high performance computing domain, being the tool of choice by several national laboratories in the US.
+We based on their home page~\cite{dmtcp} to complete our section comparing them.
+Additionally, the Berkeley Lab's Checkpoint-Restart~\cite{blcr} (BLCR) is also an HPC-focused tool, although it has lost some traction during the last years. 
+
+A stretch goal for this project was to implement live migration of distributed container deployments, for which distributed checkpointing algorithms would be crucial.
+Even though we have not had time to address the implementation of such a concept, we have used several well-established resources for documentation purposes.
+We would like to highlight the works by Raynal~\cite{Raynal2013} and Kshemkalyani~\cite{Kshemkalyani2008}.
+
+\section{Applications of C/R and Live Migration} \label{sec:rw-app}
+
+Even though C/R and live migration are a relatively mature topic of research, scientific contributions covering particular applications are way more scarce.
+This was, among others, one of our initial motivations for this work.
+Some of the earlier pieces of research stem from the same research group developing DMTCP.
+Being HPC the target community for the project, one of the most popular applications of DMTCP is checkpointing of MPI applications.
+The first references date from 2002~\cite{Bosilca2002}, but the first contribution from the DMTPC team did not appear until 2016 in the work by Arya \textit{et al.}~\cite{Arya2016}, which finally resulted in \textit{MANA for MPI: MPI-Agnostic Network-Agnostic Transparent Checkpointing}~\cite{Garg2019}.
+This last piece of work summarizes all the previous contributions as it allows for transparent checkpointing of any MPI implementation and network combination.
+The current lines of research focus on proving this approach's scalability and GPU checkpointing.
+
+For application-oriented projects leveraging \criu we would like to highlight the work by Venkatesh~\cite{Venkatesh2019}.
+This contribution is relevant to our work as it focuses on fast and efficient checkpoint-restore for \textsc{Docker} containers.
+In particular, the authors present an optimization to the file-based image procedure using the new (as of 2019) kernel support for multiple independent virtual addresses space (MVAS).
+We can not leverage the findings in our project as it only focuses on single-machine C/R.
+
+Another interesting application of \criu for \textsc{Docker} container migration is the recent article by Antonio Barbalace \textit{et al.}~\cite{Barbalace2020}.
+In this work, the authors aim to overcome the limitation in migration for edge computing imposed by the different instruction set architectures (ISAs) each node may have.
+To achieve this goal they rely on containerization and \criu.
+Our work focuses on live migration of server-side oriented services, hence why the edge computing use case is not directly applicable.
+Similarly, the work by Machen~\cite{Machen2018} also targets the edge computing scenario.
+In particular, the author presents a layered framework to perform live migration of services in mobile edge clouds.
+These services can be encapsulated in either virtual machines or containers within VMs, and the authors rely on native VM migration with LXC and KVM.
+
+A contribution to \criu which stemmed from an application use case and which we could leverage in the project was presented by Stoyanov in 2018~\cite{Stoyanov2018}.
+The author optimizes downtime during container live migration by utilizing \criu's newly added feature: the image cache/proxy.
+Another article covering efficient live migration of \textsc{Docker} containers was presented in late 2019 by Zeynep and Pelin~\cite{Zeynep2019}.
+The authors focus on the support for C/R implemented in \textsc{Docker} and focus on securing the migration process to protect against potential attacks.
+Although the security approach is novel in nature, the fact that the authors use the outdated and not-maintained \textsc{Docker} integration of \criu's C/R makes it not-reusable for our project.
+
+Also in the HPC domain, but focused on container migration, lie the pieces of work by Berg~\cite{Berg2017}, and Sindi~\cite{Sindi2019}.
+The former follows more of a survey-like style, in which the authors proof the feasibility of using C/R for containers in HPC.
+Similarly, the latter showcases different applications of \criu's migration capabilities in HPC.
+In particular, the authors present a migration of an MPI application, although they don't compare it with the work here described previously.
+
+Lastly, the contribution that most closely matches our goal of providing an efficient, transparent, easy-to-use migration library for running containers is the Process Hauler (\textsc{P.Haul}) project~\cite{phaul-criu,phaul-github}.
+Initiated by the same \criu developers, the work was an early attempt to wrap all the technical details behind efficient live migration and deliver it as a solution to the end user.
+Unfortunately, the development stopped in late 2017, what greatly motivated this work.
