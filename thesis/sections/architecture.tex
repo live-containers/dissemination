@@ -1,36 +1,62 @@
 \chapter{Implementing Efficient Live Migration} \label{chap:system}
 
-In this chapter we present our implementation of live migration of \runc containers using \criu.
-In order to achieve efficiency, liveness, and mimic a realistic setting, we explore disk-less and iterative migrations, and checkpointing established TCP connections and external namespaces.
-First, in \S\ref{sec:arch-blocks}, we cover the implementation of each of these features in \criu and their integration with \runc.
-Then, we perform a set of micro-benchmarks to assess their impact on performance, and finish with a snippet showcasing their usage.
-Lastly, in \S\ref{sec:system}, we provide insights on our final open source implementation available at \url{https://github.com/live-containers/live-migration}.
+In this chapter we present our implementation of live migration of \runc
+containers using \criu.
+In order to achieve efficiency, liveness, and mimic a realistic setting, we
+explore disk-less and iterative migrations, and checkpointing established TCP
+connections and external namespaces.
+First, in \S\ref{sec:arch-blocks}, we cover the implementation of each of these
+features in \criu and their integration with \runc.
+Then, we perform a set of micro-benchmarks to assess their impact on
+performance, and finish with a snippet showcasing their usage.
+Lastly, in \S\ref{sec:system}, we provide insights on our final open source
+implementation available at
+\url{https://github.com/live-containers/live-migration}.
 
 \section{Building Blocks} \label{sec:arch-blocks}
 
-In this first section we study the implementation of diskless and iterative migration in \criu.
+In this first section we study the implementation of diskless and iterative
+migration in \criu.
 The former allows fast checkpoint/restore without writing to disk.
-The latter allows for incremental dumps, which in turn reduces downtime when migrating an application as the load can be divided among subsequent dumps.
-We also introduce how to checkpoint and migrate established TCP connections and established namespaces.
+The latter allows for incremental dumps, which in turn reduces downtime when
+migrating an application as the load can be divided among subsequent dumps.
+We also introduce how to checkpoint and migrate established TCP connections and
+established namespaces.
 
 For each different feature, we prepare a set of experiments.
-Unless otherwise stated, we run each one in a Debian machine with kernel version \texttt{4.19.0-6} and use \criu version 3.13 and \runc version \texttt{1.0.0-rc8}, both built from source.
+Unless otherwise stated, we run each one in a Debian machine with kernel
+version \texttt{4.19.0-6} and use \criu version 3.13 and \runc version
+\texttt{1.0.0-rc8}, both built from source.
 
 \subsection{Diskless Migration}
 
-As previously detailed, \criu builds the snapshot of a running process using image (\texttt{.img}) files, which are stored in a user-specified path.
-As a consequence, it relies heavily on the underlying storage facility provided which, in most commodity PCs, tends to be the disk-backed file system.
-It is of no surprise then, that reading and writing from and to disk can quickly become the bottleneck in live migration's performance.
-It gets even worse when writes are duplicated, \textit{i.e.} we write once to disk to dump the process state, and a second time to transfer image files wherever they need to be restored.
-To overcome the former, we rely on \texttt{tmpfs} a virtual memory file system~\cite{tmpfs-manpage}.
+As previously detailed, \criu builds the snapshot of a running process using
+image (\texttt{.img}) files, which are stored in a user-specified path.
+As a consequence, it relies heavily on the underlying storage facility provided
+which, in most commodity PCs, tends to be the disk-backed file system.
+It is of no surprise then, that reading and writing from and to disk can
+quickly become the bottleneck in live migration's performance.
+It gets even worse when writes are duplicated, \textit{i.e.} we write once to
+disk to dump the process state, and a second time to transfer image files
+wherever they need to be restored.
+To overcome the former, we rely on \texttt{tmpfs} a virtual memory file
+system~\cite{tmpfs-manpage}.
 For the latter, we leverage \criu's \texttt{page-server}.
 
 % TMPFS
-First presented by Sun Microsystems in 2007~\cite{Snyder2007}, \texttt{tmpfs} is a memory-based file system that uses resources from the virtual memory subsystem.
-According to the Linux Programmer's Manual~\cite{tmpfs-manpage}, this file system can employ swap space if memory pressure is high, only consumes as much memory as required to store the current files (regardless of the allocated size), and unmounting it destroys the contents therein.
-Since the files actually reside in memory, the user benefits from memory-like read/write performance.
-A notable use of \texttt{tmpfs} is \texttt{/dev/shm}, used in the POSIX-compliant implementation of shared memory and in POSIX semaphores.
-One such file system can be easily created and destroyed using \texttt{mount} and \texttt{umount} as detailed in Listing~\ref{code:tmpfs-example}
+First presented by Sun Microsystems in 2007~\cite{Snyder2007}, \texttt{tmpfs}
+is a memory-based file system that uses resources from the virtual memory
+subsystem.
+According to the Linux Programmer's Manual~\cite{tmpfs-manpage}, this file
+system can employ swap space if memory pressure is high, only consumes as much
+memory as required to store the current files (regardless of the allocated
+size), and unmounting it destroys the contents therein.
+Since the files actually reside in memory, the user benefits from memory-like
+read/write performance.
+A notable use of \texttt{tmpfs} is \texttt{/dev/shm}, used in the
+POSIX-compliant implementation of shared memory and in POSIX semaphores.
+One such file system can be easily created and destroyed using \texttt{mount}
+and \texttt{umount} as detailed in Listing~\ref{code:tmpfs-example}
 \begin{lstlisting}[style=Bash,caption={Mounting and dismounting a \texttt{tmpfs} file system.},label={code:tmpfs-example}]
 #!/bin/bash
 # Mount a tmpfs file system rooted in the /tmp/my-tmpfs directory with maximum size 100 MB
@@ -42,22 +68,38 @@ sudo mount | grep /tmp/my-tmpfs
 
 # Unmount the file system 
 sudo umount /tmp/my-tmpfs # CAUTION: THIS WILL DESTROY THE CONTENTS
-\end{lstlisting}
+\end{lstlisting} 
 
+The page server is a component of \criu that allows to send memory dumps
+directly through the network, saving disk read/writes on the origin, writing
+them once they reach the destination system~\cite{criu-page-server}.
 % Page-server
-The page server is a component of \criu that allows to send memory dumps directly through the network, saving disk read/writes on the origin, writing them once they reach the destination system~\cite{criu-page-server}.
-Note that the page server is used only to migrate memory files, which tend to be the largest ones, whereas other image files still need to be transferred when migrating.
-The current implementation uses only TCP sockets and no encryption nor compression is used on the network transfer.
-It is also worth mentioning that \texttt{criu page-server --port} is a one-shot command, \textit{i.e.} if we perform multiple dumps, a page server must be started for each one of them.
-Observe that, even though it introduces a small overhead, our results (see Figure~\ref{fig:diskless-migration-microbenchmark}) show that for migrations within the same machine, setting up a page server in \texttt{localhost} outperforms the double-copying approach for larger applications.
+Note that the page server is used only to migrate memory files, which tend to
+be the largest ones, whereas other image files still need to be transferred
+when migrating.
+The current implementation uses only TCP sockets and no encryption nor
+compression is used on the network transfer.
+It is also worth mentioning that \texttt{criu page-server --port} is a one-shot
+command, \textit{i.e.} if we perform multiple dumps, a page server must be
+started for each one of them.
+Observe that, even though it introduces a small overhead, our results (see
+Figure~\ref{fig:diskless-migration-microbenchmark}) show that for migrations
+within the same machine, setting up a page server in \texttt{localhost}
+outperforms the double-copying approach for larger applications.
 
 % Integration w/ runC
-As introduced in the previous paragraphs, the key pieces to achieve efficient diskless migrations are making use of a \texttt{tmpfs} file system and \criu's page server.
-The former is in another level of abstraction than \runc, and for the latter we need to start the page server separately and then checkpoint passing address and port as a parameter to the \texttt{--page-server} flag.
-In Listings~\ref{code:microbenchmark-diskless-runc} and~\ref{code:microbenchmark-diskless-criu} we include snippets to perform a checkpoint with a page server using \runc and \criu respectively.
+As introduced in the previous paragraphs, the key pieces to achieve efficient
+diskless migrations are making use of a \texttt{tmpfs} file system and \criu's
+page server.
+The former is in another level of abstraction than \runc, and for the latter we
+need to start the page server separately and then checkpoint passing address
+and port as a parameter to the \texttt{--page-server} flag.
+In Listings~\ref{code:microbenchmark-diskless-runc}
+and~\ref{code:microbenchmark-diskless-criu} we include snippets to perform a
+checkpoint with a page server using \runc and \criu respectively.
 \begin{figure}[h!]
-\begin{minipage}{.45\textwidth}
-    \begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \runc using a page server.},label={code:microbenchmark-diskless-runc}]
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \runc using a page server.},label={code:microbenchmark-diskless-runc}]
 #!/bin/bash
 # Start the Page Server
 sudo criu page-server \
@@ -77,9 +119,9 @@ sudo runc checkpoint \
 cp /path/to/src/images/* \
     /path/to/dst/images/
 \end{lstlisting}
-\end{minipage}\hfill
-\begin{minipage}{.45\textwidth}
-    \begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \criu using a page server.},label={code:microbenchmark-diskless-criu}]
+    \end{minipage}\hfill
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[style=Bash,caption={Commands to perform a checkpoint in \criu using a page server.},label={code:microbenchmark-diskless-criu}]
 #!/bin/bash
 # Start the Page Server
 sudo criu page-server \
@@ -99,77 +141,145 @@ sudo runc checkpoint \
 cp /path/to/src/images/* \
     /path/to/dst/images/
 \end{lstlisting}
-\end{minipage}
+    \end{minipage}
 \end{figure}
 
 % Experiment
-In order to benchmark the performance of diskless migration when compared to disk-based one and the benefits of using a page server, we set up two different experiments.
-In one hand we have a counter program written in C (see Listing~\ref{code:c-counter} for the full implementation) that increments a value and prints it to \texttt{stdout}.
-On the other hand we have an instance of a \redis in-memory database that we pre-load with $1e7$ keys.
+In order to benchmark the performance of diskless migration when compared to
+disk-based one and the benefits of using a page server, we set up two different
+experiments.
+In one hand we have a counter program written in C (see
+Listing~\ref{code:c-counter} for the full implementation) that increments a
+value and prints it to \texttt{stdout}.
+On the other hand we have an instance of a \redis in-memory database that we
+pre-load with $1e7$ keys.
 The total weight of the memory image dump is $912$ MB.
-For each experiment, we measure the time to checkpoint the process and transfer the remaining images to a different directory, either locally or on a different machine in the same local network.
-We compare the performance when using \texttt{tmpfs} directories to store the images (diskless) or not (file-based) and when using a page server or not.
-Each test is run 100 times and we present the average and standard deviation values obtained in Figure~\ref{fig:diskless-migration-microbenchmark}.
+For each experiment, we measure the time to checkpoint the process and transfer
+the remaining images to a different directory, either locally or on a different
+machine in the same local network.
+We compare the performance when using \texttt{tmpfs} directories to store the
+images (diskless) or not (file-based) and when using a page server or not.
+Each test is run 100 times and we present the average and standard deviation
+values obtained in Figure~\ref{fig:diskless-migration-microbenchmark}.
 
-% Results
+% Results jfaksdljgaklsdgj ajskdgjk sdjksdg jsdkgj lorem lorem lorem ipsum mare meva quines ganes de que.
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=.8\textwidth]{figs/diskless-migration-microbenchmark/diskless_migration_microbenchmark.pdf}
-    \caption[Size of the memory image for iterative dumps.]{Time elapsed checkpointing and migrating a running process when using file-based or diskless migration, with and without a page server. We compare the results for a small application (around 100 kB, left) and a big one (around 1 GB, right).\label{fig:diskless-migration-microbenchmark}}.
+
+    \includegraphics[width=.8\textwidth]{figs/diskless-migration-microbenchmark/dis
+        kless_migration_microbenchmark.pdf}
+    \caption[Size of the memory image for iterative dumps.]{Time elapsed
+        checkpointing and migrating a running process when using file-based or
+        diskless
+        migration, with and without a page server.
+        We compare the results for a small application (around 100 kB, left) and a big
+        one (around 1 GB, right).
+        \label{fig:diskless-migration-microbenchmark}}.
 \end{figure}
 
-The first and most important conclusion we draw from our results is that there is no one-size-fits-all solution when choosing the best setting to migrate our application.
+The first and most important conclusion we draw from our results is that there
+is no one-size-fits-all solution when choosing the best setting to migrate our
+application.
 It seems clear that diskless is always equal or better than non-diskless.
-This was to be expected, as for the same setting, \texttt{tmpfs} gives better raw read/write performance.
-For instance, when transferring image files from one machine to the other, the perceived end-to-end throughput between \texttt{tmpfs} directories is in the order of 100-120 Mbps compared to the 60-70 Mbps for regular directories.
-However, there might be situations, or systems, which simply don't have that much free memory.
-The Redis dump files alone already take up 1 GB of memory, unacceptable in constrained devices.
+This was to be expected, as for the same setting, \texttt{tmpfs} gives better
+raw read/write performance.
+For instance, when transferring image files from one machine to the other, the
+perceived end-to-end throughput between \texttt{tmpfs} directories is in the
+order of 100-120 Mbps compared to the 60-70 Mbps for regular directories.
+However, there might be situations, or systems, which simply don't have that
+much free memory.
+The Redis dump files alone already take up 1 GB of memory, unacceptable in
+constrained devices.
 
-If the application is sufficiently small (a dump for an instance of the counter process is around 90 kB), the overhead of running a page server is higher than simply writing the files twice, both in the local and remote setting.
-However, for large applications, diskless outweighs the page server in the local case, whereas if we have to send files over the network, running a page server is more important than using the diskless approach (although a combination of both yields the best performance).
-We include the full evaluation scripts in Listing~\ref{code:microbenchmark-diskless-evaluation}.
+If the application is sufficiently small (a dump for an instance of the counter
+process is around 90 kB), the overhead of running a page server is higher than
+simply writing the files twice, both in the local and remote setting.
+However, for large applications, diskless outweighs the page server in the
+local case, whereas if we have to send files over the network, running a page
+server is more important than using the diskless approach (although a
+combination of both yields the best performance).
+We include the full evaluation scripts in
+Listing~\ref{code:microbenchmark-diskless-evaluation}.
 
 \subsection{Iterative Migration}
 
 % Brief Introduction
 %As introduced in \S
 
-Implemented in \criu we find a series of features that enable us to perform iterative migrations of running processes.
-This is, periodically snapshot the state of the process without altering it until some condition is triggered, that in turn checkpoints the container and restores it elsewhere.
-The key idea being that all the heavy work for the snapshot (\textit{i.e.} capturing the memory state and transferring it) will have already been done in previous iterations, hence minimizing the application downtime.
+Implemented in \criu we find a series of features that enable us to perform
+iterative migrations of running processes.
+This is, periodically snapshot the state of the process without altering it
+until some condition is triggered, that in turn checkpoints the container and
+restores it elsewhere.
+The key idea being that all the heavy work for the snapshot (\textit{i.e.}
+capturing the memory state and transferring it) will have already been done in
+previous iterations, hence minimizing the application downtime.
 
-In the previous paragraph we have assumed that transfers across consequent snapshots will be smaller in size, otherwise the $n$-th dump would not be any faster than the first one, and we would be wasting a lot of bandwidth since the same information would be sent repeatedly.
-This reduction in size can be achieved through memory tracking, a procedure through which memory pages written between dumps are marked as \emph{dirty} and hence included in the following transfer.
+In the previous paragraph we have assumed that transfers across consequent
+snapshots will be smaller in size, otherwise the $n$-th dump would not be any
+faster than the first one, and we would be wasting a lot of bandwidth since the
+same information would be sent repeatedly.
+This reduction in size can be achieved through memory tracking, a procedure
+through which memory pages written between dumps are marked as \emph{dirty} and
+hence included in the following transfer.
 Therefore, to implement efficient iterative migration we need:
 \begin{enumerate}
-    \item \textbf{Pre-Dump:} A procedure to snapshot the memory of the process without stopping it (note that, at this point, we don't need all the other details).
-    \item \textbf{Memory Tracking:} A procedure to keep track of the memory changes in a process' address space.
-    \item \textbf{Parent Directory:} A procedure to link together subsequent dumps so that they can be correctly re-interpreted at restore time.
+    \item \textbf{Pre-Dump:} A procedure to snapshot the memory
+          of the process without stopping it (note that, at this point, we don't need all
+          the other details).
+    \item \textbf{Memory Tracking:}
+          A procedure to keep track of the memory changes in a process' address space.
+    \item \textbf{Parent Directory:}
+          A procedure to link together subsequent dumps so that they can be correctly
+          re-interpreted at restore time.
 \end{enumerate}
 
-The first step during an iterative migration consists on dumping \emph{all} of the process memory to an image file.
-This allows for a baseline from which smaller \emph{incremental} dumps are performed.
-Note that, at this point, we are not interested in capturing the whole state, hence the usage of the \texttt{pre-dump} command in CRIU.
+The first step during an iterative migration consists on dumping \emph{all} of
+the process memory to an image file.
+This allows for a baseline from which smaller \emph{incremental} dumps are
+performed.
+Note that, at this point, we are not interested in capturing the whole state,
+hence the usage of the \texttt{pre-dump} command in CRIU.
 
-Memory tracking in CRIU~\cite{criu-memory-tracking} is done by means of a kernel functionality introduced in 2013~\cite{criu-memory-tracking-lwn}.
-It consists of two steps: first we ask the kernel to keep track of memory changes on a per-process basis by writing a $4$ to \texttt{/proc/pid/clear\_refs} and, after a while, reading the \texttt{/proc/pid/pagemap} file and checking the \textit{soft-dirty} bit for each page table entry (PTE).
-Internally, in the first step the kernel clears all soft-dirty bits \emph{and} the writable ones per each PTE for the given process id (PID).
-Subsequent writes to any page will trigger a page fault, a call to \texttt{pte\_mkdirty}, and therefore the \textit{soft-dirty} bit will be set.
-During the second step, at memory dump time, if this bit has not been set, the memory page needs not to be transferred again.
-To enable this functionality in \criu, we must use the \texttt{--track-mem} flag.
+Memory tracking in CRIU~\cite{criu-memory-tracking} is done by means of a
+kernel functionality introduced in 2013~\cite{criu-memory-tracking-lwn}.
+It consists of two steps: first we ask the kernel to keep track of memory
+changes on a per-process basis by writing a $4$ to
+\texttt{/proc/pid/clear\_refs} and, after a while, reading the
+\texttt{/proc/pid/pagemap} file and checking the \textit{soft-dirty} bit for
+each page table entry (PTE).
+Internally, in the first step the kernel clears all soft-dirty bits \emph{and}
+the writable ones per each PTE for the given process id (PID).
+Subsequent writes to any page will trigger a page fault, a call to
+\texttt{pte\_mkdirty}, and therefore the \textit{soft-dirty} bit will be set.
+During the second step, at memory dump time, if this bit has not been set, the
+memory page needs not to be transferred again.
+To enable this functionality in \criu, we must use the \texttt{--track-mem}
+flag.
 
-One last key step required to achieve efficiency and correctness upon restore is to link the actual dump (or pre-dump) with the one preceding it, it's \emph{parent}.
-For a pre-dump, \texttt{--prev-images-dir} indicates \criu to look for existing dumps in the specified path, and perform the bit-checking described in the previous paragraphs.
-Upon restore, links among successive dumps are pieced together to successfully restore the freshest version of the running program.
+One last key step required to achieve efficiency and correctness upon restore
+is to link the actual dump (or pre-dump) with the one preceding it, it's
+\emph{parent}.
+For a pre-dump, \texttt{--prev-images-dir} indicates \criu to look for existing
+dumps in the specified path, and perform the bit-checking described in the
+previous paragraphs.
+Upon restore, links among successive dumps are pieced together to successfully
+restore the freshest version of the running program.
 
 The integration with \runc is seamless.
-The pre-dump functionality is triggered with the \texttt{--pre-dump} flag which, in turn, sets the memory tracking flag automatically~\cite{runc-memtrack}.
-Lastly, the \texttt{--parent-path} flag can be used to achieve the correct linkage between dumps.
-In Listings~\ref{code:microbenchmark-iterative-runc} and~\ref{code:microbenchmark-iterative-criu} we include the different scripts to perform the three consecutive dumps both in \criu and \runc.
-The complete scripts used for the benchmarking are included in Listing \ref{code:microbenchmark-iterative-evaluation}.
+The pre-dump functionality is triggered with the \texttt{--pre-dump} flag
+which, in turn, sets the memory tracking flag
+automatically~\cite{runc-memtrack}.
+Lastly, the \texttt{--parent-path} flag can be used to achieve the correct
+linkage between dumps.
+In Listings~\ref{code:microbenchmark-iterative-runc}
+and~\ref{code:microbenchmark-iterative-criu} we include the different scripts
+to perform the three consecutive dumps both in \criu and \runc.
+The complete scripts used for the benchmarking are included in Listing
+\ref{code:microbenchmark-iterative-evaluation}.
 \begin{figure}[h!]
-\begin{minipage}{.45\textwidth}
-    \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running process using \criu.},label={code:microbenchmark-iterative-runc}]
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running process using \criu.},label={code:microbenchmark-iterative-runc}]
 #!/bin/bash
 # First Pre-Dump
 sudo criu pre-dump \
@@ -196,9 +306,9 @@ sudo criu dump \
 
 # Process is now stopped
 \end{lstlisting}
-\end{minipage}\hfill
-\begin{minipage}{.45\textwidth}
-    \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running container using \runc.},label={code:microbenchmark-iterative-criu}]
+    \end{minipage}\hfill
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[style=Bash,caption={Scripts to perform two pre-dumps and a dump of a running container using \runc.},label={code:microbenchmark-iterative-criu}]
 #!/bin/bash
 # First Pre-Dump
 sudo runc checkpoint \
@@ -225,30 +335,56 @@ sudo runc checkpoint \
 
 # Container is now stopped
 \end{lstlisting}
-\end{minipage}
+    \end{minipage}
 \end{figure}
 
-In order to perform a micro-benchmark of this functionality we consider two different scenarios: a simple counter written in \texttt{C}, and a \redis in-memory database, as introduced in the previous section.
-For each scenario we perform two pre-dumps, and a final dump, and report the size of the \texttt{pages-1.img} file (which contains the memory dump).
-We test a static setting in which we don't change the memory during successive dumps which acts as a baseline, and a dynamic one in which, between each dump, we modify the contents of the process memory.
-For the counter, the static setting starts the program and goes to sleep, whereas the dynamic one indeed updates the counter every other second.
-For the database, we initially pre-load it with $1e7$ key-value pairs (around 300 MB of data) and then either do nothing, or run a \texttt{redis-benchmark} which alters around $1\%$ of the key pairs.
-Lastly, we compare the results of running the experiments with vanilla \criu or through \runc.
+In order to perform a micro-benchmark of this functionality we consider two
+different scenarios: a simple counter written in \texttt{C}, and a \redis
+in-memory database, as introduced in the previous section.
+For each scenario we perform two pre-dumps, and a final dump, and report the
+size of the \texttt{pages-1.img} file (which contains the memory dump).
+We test a static setting in which we don't change the memory during successive
+dumps which acts as a baseline, and a dynamic one in which, between each dump,
+we modify the contents of the process memory.
+For the counter, the static setting starts the program and goes to sleep,
+whereas the dynamic one indeed updates the counter every other second.
+For the database, we initially pre-load it with $1e7$ key-value pairs (around
+300 MB of data) and then either do nothing, or run a \texttt{redis-benchmark}
+which alters around $1\%$ of the key pairs.
+Lastly, we compare the results of running the experiments with vanilla \criu or
+through \runc.
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=.8\textwidth]{figs/iterative-migration-microbenchmark/iterative_migration_microbenchmark.pdf}
-    \caption[Size of the memory image for iterative dumps.]{Size of the dumped memory image when performing iterative dumps. For the counter experiment we report the results in kB (left axis) and for the redis one we report the results in MB (right axis). We compare the results when using \runc or purely \criu.\label{fig:iterative-migration-microbenchmark}}.
+
+    \includegraphics[width=.8\textwidth]{figs/iterative-migration-microbenchmark/it
+        erative_migration_microbenchmark.pdf}
+    \caption[Size of the memory image for iterative dumps.]{Size of the dumped
+        memory image when performing iterative dumps.
+        For the counter experiment we report the results in kB (left axis) and for the
+        redis one we report the results in MB (right axis).
+        We compare the results when using \runc or purely \criu.
+        \label{fig:iterative-migration-microbenchmark}}.
 \end{figure}
 
 We present our results in Figure~\ref{fig:iterative-migration-microbenchmark}.
-First of all, note how we use different scales for the counter application (left) and the \redis one (right).
-We observe that, as expected, if we make no changes to the process' memory after the first dump, the amount of information to be re-transferred is very little, which we attribute it to \criu's metadata.
-In the counter case, the initial dump is around 90 kB and subsequent ones are 12 kB, whereas in the \redis one, the size decreases from 900 MB to just 1 MB.
+First of all, note how we use different scales for the counter application
+(left) and the \redis one (right).
+We observe that, as expected, if we make no changes to the process' memory
+after the first dump, the amount of information to be re-transferred is very
+little, which we attribute it to \criu's metadata.
+In the counter case, the initial dump is around 90 kB and subsequent ones are
+12 kB, whereas in the \redis one, the size decreases from 900 MB to just 1 MB.
 Once we modify the memory, additional pages need to be transferred.
-In the counter case, between successive dumps we just increase the value of a variable and alter the state of \texttt{stdout}, what translates in a 10 kB increase in the image size every time.
-In the \redis one, the \texttt{redis-benchmark} is non-deterministic in nature, but it's worth observing how shuffling a percent of the total key-store propagates to higher percentages of memory re-use.
-We conclude that memory tracking is a necessary feature if any application considers even near-live migration of production applications, and the technology presented allows for an easy way to do so.
+In the counter case, between successive dumps we just increase the value of a
+variable and alter the state of \texttt{stdout}, what translates in a 10 kB
+increase in the image size every time.
+In the \redis one, the \texttt{redis-benchmark} is non-deterministic in nature,
+but it's worth observing how shuffling a percent of the total key-store
+propagates to higher percentages of memory re-use.
+We conclude that memory tracking is a necessary feature if any application
+considers even near-live migration of production applications, and the
+technology presented allows for an easy way to do so.
 
 %\subsubsection*{Aside: Memory Deduplication}
 %
@@ -262,61 +398,109 @@ We conclude that memory tracking is a necessary feature if any application consi
 
 \subsection{Checkpointing TCP Connections}
 
-The ability to checkpoint established TCP connection is mainly due to the inclusion of the \texttt{TCP\_REPAIR} socket option to kernel version $3.5$~\cite{tcp-connection-repair}.
+The ability to checkpoint established TCP connection is mainly due to the
+inclusion of the \texttt{TCP\_REPAIR} socket option to kernel version
+$3.5$~\cite{tcp-connection-repair}.
 
-Similarly to other resources and as introduced in \S\ref{chap:background}, basic information about sockets is obtained by parsing the adequate files in the \texttt{/proc} file system.
-However, there are some internals of active network connections (namely negotiated parameters such as send and receive queues, and sequence numbers) that require putting the socket in the \texttt{TCP\_REPAIR} state using the \texttt{setocketopt()} syscall (note that this action requires \texttt{CAP\_NET\_ADMIN} capabilities).
-Then, if the connection is closed whilst the socket is in \texttt{TCP\_REPAIR} mode, no \texttt{FIN} nor \texttt{RST} packets are sent to the other peer, what means that his endpoint is effectively still open~\cite{Corbet12}.
+Similarly to other resources and as introduced in \S\ref{chap:background},
+basic information about sockets is obtained by parsing the adequate files in
+the \texttt{/proc} file system.
+However, there are some internals of active network connections (namely
+negotiated parameters such as send and receive queues, and sequence numbers)
+that require putting the socket in the \texttt{TCP\_REPAIR} state using the
+\texttt{setocketopt()} syscall (note that this action requires
+\texttt{CAP\_NET\_ADMIN} capabilities).
+Then, if the connection is closed whilst the socket is in \texttt{TCP\_REPAIR}
+mode, no \texttt{FIN} nor \texttt{RST} packets are sent to the other peer, what
+means that his endpoint is effectively still open~\cite{Corbet12}.
 
-To re-establish the connection from the newly generated socket, the first thing to do is put it, again, in \texttt{TCP\_REPAIR} mode.
-Then, the previously dumped parameters can be set, and upon \texttt{connect()} the socket goes directly into \texttt{ESTABLISHED} mode without acknowledgment from the other end, and a \texttt{RST} packet is sent to resume communication.
+To re-establish the connection from the newly generated socket, the first thing
+to do is put it, again, in \texttt{TCP\_REPAIR} mode.
+Then, the previously dumped parameters can be set, and upon \texttt{connect()}
+the socket goes directly into \texttt{ESTABLISHED} mode without acknowledgment
+from the other end, and a \texttt{RST} packet is sent to resume communication.
 
 % TABLE FILTERING
-The last missing piece is what happens if the remote end tries to send a packet to its, seemingly open, TCP socket whilst the other peer is down.
-Were we to ignore this fact, once the packet reached our kernel this, given that the socket is closed, would send a \texttt{RST} to the other end, and our whole illusion would collapse.
-To overcome this issue, upon checkpoint we include a set of rules to the \texttt{netfilter}~\cite{netfilter} IP routing table to drop all packets.
+The last missing piece is what happens if the remote end tries to send a packet
+to its, seemingly open, TCP socket whilst the other peer is down.
+Were we to ignore this fact, once the packet reached our kernel this, given
+that the socket is closed, would send a \texttt{RST} to the other end, and our
+whole illusion would collapse.
+To overcome this issue, upon checkpoint we include a set of rules to the
+\texttt{netfilter}~\cite{netfilter} IP routing table to drop all packets.
 We include the set of rules in Table~\ref{table:iptables-rules}.
 \begin{table}[h!]
     \centering
-    {\ttfamily 
-    \begin{tabular}{p{3cm}p{1cm}p{1cm}p{2.5cm}p{2.5cm}p{5.0cm}}
-        \multicolumn{6}{l}{Chain INPUT (policy ACCEPT)} \\[3pt]
-        target & prot & opt & source & dest & \\[3pt]
-        CRIU & all & -- & <source\_IP> & <dest\_IP> & \\[3pt]
-        & & & & & \\[3pt]
-        \multicolumn{6}{l}{Chain FORWARD (policy ACCEPT)} \\[3pt]
-        target & prot & opt & source & dest & \\[3pt]
-        & & & & & \\[3pt]
-        \multicolumn{6}{l}{Chain OUTPUT (policy ACCEPT)} \\[3pt]
-        target & prot & opt & source & dest & \\[3pt]
-        CRIU & all & -- & <source\_IP> & <dest\_IP> & \\[3pt]
-        & & & & & \\[3pt]
-        \multicolumn{6}{l}{Chain CRIU} \\[3pt]
-        target & prot & opt & source & dest & \\[3pt]
-        ACCEPT & all & -- & <source\_IP> & <dest\_IP> & mark match ! 0xc114\\[3pt]
-        DROP & all & -- & .../0 & .../0 & \\[3pt]
-    \end{tabular}
+    {\ttfamily
+        \begin{tabular}
+            {p{3cm}p{1cm}p{1cm}p{2.5cm}p{2.5cm}p{5.0cm}}
+            \multicolumn{6}{l}{Chain INPUT (policy ACCEPT)}
+            \\[3pt]
+            target & prot & opt & source       & dest       &
+            \\[3pt]
+            CRIU   & all  & --  & <source\_IP> & <dest\_IP> &
+            \\[3pt]
+                   &      &     &              &            &
+            \\[3pt]
+            \multicolumn{6}{l}{Chain FORWARD (policy ACCEPT)}
+            \\[3pt]
+            target & prot & opt & source       & dest       &
+            \\[3pt]
+                   &      &     &              &            &
+            \\[3pt]
+            \multicolumn{6}{l}{Chain OUTPUT (policy ACCEPT)}
+            \\[3pt]
+            target & prot & opt & source       & dest       &
+            \\[3pt]
+            CRIU   & all  & --  & <source\_IP> & <dest\_IP> &
+            \\[3pt]
+                   &      &     &              &            &
+            \\[3pt]
+            \multicolumn{6}{l}{Chain CRIU}
+            \\[3pt]
+            target & prot & opt & source       & dest       &
+            \\[3pt]
+            ACCEPT & all  & --  & <source\_IP> & <dest\_IP> & mark match !
+            0xc114
+            \\[3pt]
+            DROP   & all  & --  & .../0        & .../0      &
+            \\[3pt]
+        \end{tabular}
     }
-    \caption{Output of running \texttt{iptables -t filter -L -n}.\label{table:iptables-rules}}.
+    \caption{Output of running \texttt{iptables -t filter -L
+            -n}.\label{table:iptables-rules}}.
 \end{table}
 
 \textbf{Efficient IP Address Re-Use}
 
-A caveat of restoring established TCP connections is that, without bringing down both peers, we can not circumvent the negotiated \texttt{IP:PORT} pairs.
-As a consequence, the same IP address and port must be available at restore time.
-Otherwise, when the remote peer receives the \texttt{RST} package it will immediately close the connection.
-Re-using an IP address is achievable using locally scoped addresses or network namespaces.
+A caveat of restoring established TCP connections is that, without bringing
+down both peers, we can not circumvent the negotiated \texttt{IP:PORT} pairs.
+As a consequence, the same IP address and port must be available at restore
+time.
+Otherwise, when the remote peer receives the \texttt{RST} package it will
+immediately close the connection.
+Re-using an IP address is achievable using locally scoped addresses or network
+namespaces.
 In our experiments we tested both.
 
-Firstly, if we are migrating into a different machine (as the experiments presented below), we need to assign addresses using \texttt{ip}'s \texttt{addr} subcommands.
-In particular, we are using a \texttt{host-only}~\cite{vbox-hostonly} subnet to manage our (virtual) machines.
+Firstly, if we are migrating into a different machine (as the experiments
+presented below), we need to assign addresses using \texttt{ip}'s \texttt{addr}
+subcommands.
+In particular, we are using a \texttt{host-only}~\cite{vbox-hostonly} subnet to
+manage our (virtual) machines.
 
-Alternatively, we have also tested process migration within the same machine, from one network namespace to a different one.
-This situation is particularly interesting as it recreates what happens under the hood in \criu's binding for \runc, as containers rely on namespaces for isolation.
-We set up a bridge device in the host namespace, two network namespaces, and two virtual ethernet devices with one peer tied to the bridge, and the other one inside a namespace.
-Adequately setting up addresses and default gateway routes, we achieve the setup we depict in Figure~\ref{fig:veth-arch}.
+Alternatively, we have also tested process migration within the same machine,
+from one network namespace to a different one.
+This situation is particularly interesting as it recreates what happens under
+the hood in \criu's binding for \runc, as containers rely on namespaces for
+isolation.
+We set up a bridge device in the host namespace, two network namespaces, and
+two virtual ethernet devices with one peer tied to the bridge, and the other
+one inside a namespace.
+Adequately setting up addresses and default gateway routes, we achieve the
+setup we depict in Figure~\ref{fig:veth-arch}.
 \begin{figure}[h!]
-    \centering    
+    \centering
     \begin{tikzpicture}
         % Color definition
         \definecolor{machineBG}{RGB}{240, 242, 245}
@@ -326,38 +510,63 @@ Adequately setting up addresses and default gateway routes, we achieve the setup
         % Host network box
         \draw[fill=machineBG, rounded corners] (0,0) rectangle (6, 4);
         % Network Namespace 1 and Peer
-        \draw[fill=namespaceBG, rounded corners] (0.25, 0.25) rectangle (2.75, 2.0);
+        \draw[fill=namespaceBG, rounded corners] (0.25, 0.25) rectangle (2.75,
+        2.0);
         \node at (1.5, 0.75) {\textbf{\texttt{net-ns-1}}};
-        \draw[fill=white] (0.4, 1.35) rectangle (2.6, 1.85) node[pos=.5] {\text{\texttt{netfilter}}};
+        \draw[fill=white] (0.4, 1.35) rectangle (2.6, 1.85) node[pos=.5]
+            {\text{\texttt{netfilter}}};
         \draw[<->, dashed] (1.5,2) -- (1.5,2.5);
-        \draw[fill=namespaceBG, rounded corners] (0.25, 2.5) rectangle (2.75, 3) node[pos=.5] {\text{\texttt{veth-peer1}}};
+        \draw[fill=namespaceBG, rounded corners] (0.25, 2.5) rectangle (2.75,
+        3) node[pos=.5] {\text{\texttt{veth-peer1}}};
         % Network Namespace 2
-        \draw[fill=namespaceBG, rounded corners] (3.25, 0.25) rectangle (5.75, 2.0);
+        \draw[fill=namespaceBG, rounded corners] (3.25, 0.25) rectangle (5.75,
+        2.0);
         \node at (4.5, 0.75) {\textbf{\texttt{net-ns-2}}};
-        \draw[fill=white] (3.4, 1.35) rectangle (5.6, 1.85) node[pos=.5] {\text{\texttt{netfilter}}};
+        \draw[fill=white] (3.4, 1.35) rectangle (5.6, 1.85) node[pos=.5]
+            {\text{\texttt{netfilter}}};
         \draw[<->, dashed] (4.5,2) -- (4.5,2.5);
-        \draw[fill=namespaceBG, rounded corners] (3.25, 2.5) rectangle (5.75, 3) node[pos=.5] {\text{\texttt{veth-peer2}}};
+        \draw[fill=namespaceBG, rounded corners] (3.25, 2.5) rectangle (5.75,
+        3) node[pos=.5] {\text{\texttt{veth-peer2}}};
         % Local Bridge
-        \draw[fill=bridgeBG, rounded corners] (0.25, 3.25) rectangle (5.75, 3.75) node[pos=.5] {\textbf{Local Bridge}};
+        \draw[fill=bridgeBG, rounded corners] (0.25, 3.25) rectangle (5.75,
+        3.75) node[pos=.5] {\textbf{Local Bridge}};
 
         % Connecting line
-        \draw[<->, dashed, very thick] (3,4) -- (3,5) node[pos=.5] {Established \hspace{5pt} TCP Socket};
+        \draw[<->, dashed, very thick] (3,4) -- (3,5) node[pos=.5] {Established
+            \hspace{5pt}
+            TCP Socket}; 
 
+        \draw[fill=machineBG, rounded corners] (0,5) rectangle (6, 6) node[pos=.5]
+            {\textbf{Outside Network}};
+    \end{tikzpicture} \caption{Architecture of three
+        different namespaces connected through virtual ethernet pairs.
         % Outside network box
-        \draw[fill=machineBG, rounded corners] (0,5) rectangle (6, 6) node[pos=.5] {\textbf{Outside Network}};
-    \end{tikzpicture}
-    \caption{Architecture of three different namespaces connected through virtual ethernet pairs.\label{fig:veth-arch}}
+        \label{fig:veth-arch}}
 \end{figure}
 
 Integration with \runc is two-fold.
-For the TCP connection \criu's binding for \runc includes a \texttt{--tcp-established} flag that does most of the socket management.
-If we are interested in restoring the connection in a different machine or namespace, we must manually recreate the filter table from Table~\ref{table:iptables-rules} using the \texttt{iptables} command.
-Lastly, to restore into an existing namespace, the container must be restored with the adequate open file descriptors using \criu's \texttt{--external}~\cite{criu-external} and \texttt{--inherit-fd}~\cite{criu-inherit-fd}.
-In Listings~\ref{code:microbenchmark-tcp-nonetns} and~\ref{code:microbenchmark-tcp-netns} we include excerpts of snippets to checkpoint and restore an established TCP connection without or within a network namespace respectively.
-The complete scripts for the evaluation are included in Listings~\ref{code:microbenchmark-tcp-criu-downtime} and~\ref{code:microbenchmark-tcp-criu-reactivity} for \criu's downtime and reactivity experiments, and in Listings~\ref{code:microbenchmark-tcp-runc-downtime} and~\ref{code:microbenchmark-tcp-runc-reactivity} for \runc's.
+For the TCP connection \criu's binding for \runc includes a
+\texttt{--tcp-established} flag that does most of the socket management.
+If we are interested in restoring the connection in a different machine or
+namespace, we must manually recreate the filter table from
+Table~\ref{table:iptables-rules} using the \texttt{iptables} command.
+Lastly, to restore into an existing namespace, the container must be restored
+with the adequate open file descriptors using \criu's
+\texttt{--external}~\cite{criu-external} and
+\texttt{--inherit-fd}~\cite{criu-inherit-fd}.
+In Listings~\ref{code:microbenchmark-tcp-nonetns}
+and~\ref{code:microbenchmark-tcp-netns} we include excerpts of snippets to
+checkpoint and restore an established TCP connection without or within a
+network namespace respectively.
+The complete scripts for the evaluation are included in
+Listings~\ref{code:microbenchmark-tcp-criu-downtime}
+and~\ref{code:microbenchmark-tcp-criu-reactivity} for \criu's downtime and
+reactivity experiments, and in
+Listings~\ref{code:microbenchmark-tcp-runc-downtime}
+and~\ref{code:microbenchmark-tcp-runc-reactivity} for \runc's.
 \begin{figure}[h!]
-\begin{minipage}{.45\textwidth}
-    \begin{lstlisting}[style=Bash,caption={Checkpoint and restore an established TCP connection using \criu and \runc.},label={code:microbenchmark-tcp-nonetns}]
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[style=Bash,caption={Checkpoint and restore an established TCP connection using \criu and \runc.},label={code:microbenchmark-tcp-nonetns}]
 #!/bin/bash
 # CRIU Dump and Restore, one after the other 
 # but in the BG (not affecting time)
@@ -382,9 +591,9 @@ sudo runc restore \
     eureka; \
 cd `CWD`) &
 \end{lstlisting}
-\end{minipage}\hfill
-\begin{minipage}{.45\textwidth}
-    \begin{lstlisting}[style=Bash,caption={Excerpt of a script to checkpoint a connection within an existing namespace.},label={code:microbenchmark-tcp-netns}]
+    \end{minipage}\hfill
+    \begin{minipage}{.45\textwidth}
+        \begin{lstlisting}[style=Bash,caption={Excerpt of a script to checkpoint a connection within an existing namespace.},label={code:microbenchmark-tcp-netns}]
 #!/bin/bash
 # Two namespaces with path NS_1 and NS_2
 INO_1=$(ls -iL ${NS_1} | awk '{ print $1 }')
@@ -409,79 +618,143 @@ sudo criu restore \
     --inherit-fd fd[33]:${NS_1} \
     --inherit-fd fd[34]:${NS_2} -d
 \end{lstlisting}
-\end{minipage}
+    \end{minipage}
 \end{figure}
 
 \textbf{Benchmarking}
 
-In order to evaluate the impact of migrating a process with an established TCP connection, we are interested in assessing how quickly can communication resume after restore.
+In order to evaluate the impact of migrating a process with an established TCP
+connection, we are interested in assessing how quickly can communication resume
+after restore.
 
 To achieve this goal we set up the following testbed.
-We first deploy two identical virtual machines running Linux Debian with kernel version \texttt{4.19.0-6}.
-Each one has \criu version 3.13 and \runc version \texttt{1.0.0-rc8}, both built from source.
-Additionally, and in order to conduct the experiments, we make use of \texttt{iPerf3} (version \texttt{3.7+}) a network bandwidth benchmarking tool~\cite{iperf3}.
-In particular, we start an \texttt{iPerf3} client-server pair, one in each VM, and record the perceived throughput by the client.
-Each experiment is repeated running the bare processes and checkpointing them using \criu, or isolating them within a \runc container, to assess the introduced overhead.
-We measure from the client side since we are interested in dumping and restoring the server.
-This situation makes more sense from the cloud-provider/load-balancing standpoint.
+We first deploy two identical virtual machines running Linux Debian with kernel
+version \texttt{4.19.0-6}.
+Each one has \criu version 3.13 and \runc version \texttt{1.0.0-rc8}, both
+built from source.
+Additionally, and in order to conduct the experiments, we make use of
+\texttt{iPerf3} (version \texttt{3.7+}) a network bandwidth benchmarking
+tool~\cite{iperf3}.
+In particular, we start an \texttt{iPerf3} client-server pair, one in each VM,
+and record the perceived throughput by the client.
+Each experiment is repeated running the bare processes and checkpointing them
+using \criu, or isolating them within a \runc container, to assess the
+introduced overhead.
+We measure from the client side since we are interested in dumping and
+restoring the server.
+This situation makes more sense from the cloud-provider/load-balancing
+standpoint.
 
 \textbf{Re-connection after a down period.}
-The first experiment simulates the scenario in which the server is restored some time after the dump occurred.
-In particular, we let the client saturate the link for 10 seconds, then dump the server, and restore it 2 seconds later, all of which transparently to the client (whose connection is never closed).
-In Figure~\ref{fig:evaluation-downtime} we present the throughput perceived by the client as a function of time. 
+The first experiment simulates the scenario in which the server is restored
+some time after the dump occurred.
+In particular, we let the client saturate the link for 10 seconds, then dump
+the server, and restore it 2 seconds later, all of which transparently to the
+client (whose connection is never closed).
+In Figure~\ref{fig:evaluation-downtime} we present the throughput perceived by
+the client as a function of time.
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=\linewidth]{./figs/tcp-established-downtime/tcp_established_downtime_microbenchmark.pdf}
-    \caption[Throughput over time after a long off period]{Throughput perceived from the client as a function of time, when we checkpoint the server once, and restore it after two seconds. We compare the results of \criu and \runc. \label{fig:evaluation-downtime}}
+
+    \includegraphics[width=\linewidth]{./figs/tcp-established-downtime/tcp_establis
+        hed_downtime_microbenchmark.pdf}
+    \caption[Throughput over time after a long off period]{Throughput perceived
+        from the client as a function of time, when we checkpoint the server
+        once, and
+        restore it after two seconds.
+        We compare the results of \criu and \runc.
+        \label{fig:evaluation-downtime}}
 \end{figure}
-The first observation we make from the plot, is that it takes almost a full second to get the connection back to full speed.
-To understand this behaviour we must recall what is \texttt{iPerf3} actually doing.
-The client tries to saturate the link, sending as many packets as it can, and reports the measured capacity.
-As the socket is never closed, and packets are just discarded by the network filters, to the client it will be as if those packets were never acknowledged, and hence will try to retransmit them.
-The TCP protocol specifies~\cite{tcp-rfc} that the retransmission timeout must be doubled every time a packet is not acknowledged, therefore the recurrent outage of ACKs might cause the client to back-off for the perceived full second.
-This implies that checkpointing established TCP connections only makes sense in the scenario in which the service is soon going to be restored.
+The first observation we make from the plot, is that it takes almost a full
+second to get the connection back to full speed.
+To understand this behaviour we must recall what is \texttt{iPerf3} actually
+doing.
+The client tries to saturate the link, sending as many packets as it can, and
+reports the measured capacity.
+As the socket is never closed, and packets are just discarded by the network
+filters, to the client it will be as if those packets were never acknowledged,
+and hence will try to retransmit them.
+The TCP protocol specifies~\cite{tcp-rfc} that the retransmission timeout must
+be doubled every time a packet is not acknowledged, therefore the recurrent
+outage of ACKs might cause the client to back-off for the perceived full
+second.
+This implies that checkpointing established TCP connections only makes sense in
+the scenario in which the service is soon going to be restored.
 The next experiment tackles the behaviour under this situation.
 
 \textbf{Reactivity to immediate restore.}
-To prove our hypothesis that the large delay after a restore is due to the protocol itself rather than our implementation, we set up an experiment in which we perform a sequence of dumps and immediate restores of the same established TCP connection.
-We again present the throughput as a function of time in Figure~\ref{fig:evaluation-reactivity}.
+To prove our hypothesis that the large delay after a restore is due to the
+protocol itself rather than our implementation, we set up an experiment in
+which we perform a sequence of dumps and immediate restores of the same
+established TCP connection.
+We again present the throughput as a function of time in
+Figure~\ref{fig:evaluation-reactivity}.
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=\linewidth]{./figs/tcp-established-resolution/tcp_established_resolution_microbenchmark.pdf}
-    \caption[Throughput over time and reactivity to sudden C/R.]{Throughput from the client as a function of time as we iteratively checkpoint and restore the service immediately after.\label{fig:evaluation-reactivity}}
-\end{figure}
-In this case the measured throughput downtime does not exceed $0.1$ seconds, an order of magnitude better than the previous experiment.
-This reduced value, together with the fact that the application studied is very network-intensive, makes us believe that our proposed technique is suitable for most client-server scenarios and won't have an impact in the overall quality of service.
 
-Lastly, in both Figures we observe that, albeit being the experiments running bare processes with \criu slightly faster to restore, the overhead introduced by \runc is negligible.
+    \includegraphics[width=\linewidth]{./figs/tcp-established-resolution/tcp_establ
+        ished_resolution_microbenchmark.pdf}
+    \caption[Throughput over time and reactivity to sudden C/R.]{Throughput
+        from the client as a function of time as we iteratively checkpoint and
+        restore
+        the service immediately after.\label{fig:evaluation-reactivity}}
+\end{figure}
+In this case the measured throughput downtime does not exceed $0.1$ seconds, an
+order of magnitude better than the previous experiment.
+This reduced value, together with the fact that the application studied is very
+network-intensive, makes us believe that our proposed technique is suitable for
+most client-server scenarios and won't have an impact in the overall quality of
+service.
+
+Lastly, in both Figures we observe that, albeit being the experiments running
+bare processes with \criu slightly faster to restore, the overhead introduced
+by \runc is negligible.
 
 \section{Putting it All Together} \label{sec:system}
 
-In this section we cover our implementation of live migration of running \runc containers using \criu.
-As previously mentioned, the complete source code is available on Github: \url{https://github.com/live-containers/live-migration}.
+In this section we cover our implementation of live migration of running \runc
+containers using \criu.
+As previously mentioned, the complete source code is available on Github:
+\url{https://github.com/live-containers/live-migration}.
 The implementation is fully in \texttt{C} and it amounts to around 1300 LoC.
-We chose \texttt{C} to have a cleaner interaction with the underlying system and a smoother integration with \criu, which is also written in \texttt{C}.
-However, \criu exposes all its services via an RPC client, hence it should be compatible with a variety of other programming languages.
-Additionally, all the namespace and ip tables handling can be done natively importing the adequate libraries.
-Lastly, \runc is written in \texttt{Go} and we had to interact with it spawning a shell from the main process.
-We would like to eventually try \texttt{crun}, an OCI-compliant runtime written in \texttt{C}, and see whether performance could be improved.
+We chose \texttt{C} to have a cleaner interaction with the underlying system
+and a smoother integration with \criu, which is also written in \texttt{C}.
+However, \criu exposes all its services via an RPC client, hence it should be
+compatible with a variety of other programming languages.
+Additionally, all the namespace and ip tables handling can be done natively
+importing the adequate libraries.
+Lastly, \runc is written in \texttt{Go} and we had to interact with it spawning
+a shell from the main process.
+We would like to eventually try \texttt{crun}, an OCI-compliant runtime written
+in \texttt{C}, and see whether performance could be improved.
 We leave this for future work.
 
 \subsection{High Level Specification}
 
-We have implemented a tool that, given a container name and a remote server, migrates execution from the host where the command is run to the one specified in the argument list.
-In particular, it checkpoints the container, transfers the image files over the network, and restores remotely the execution.
-As optional parameters, the user might specify whether they prefer diskless or file-based migration (defaults to diskless), iterative or one shot (defaults to iterative), and the path where intermediate files will be stored.
+We have implemented a tool that, given a container name and a remote server,
+migrates execution from the host where the command is run to the one specified
+in the argument list.
+In particular, it checkpoints the container, transfers the image files over the
+network, and restores remotely the execution.
+As optional parameters, the user might specify whether they prefer diskless or
+file-based migration (defaults to diskless), iterative or one shot (defaults to
+iterative), and the path where intermediate files will be stored.
 
 We make two important assumptions in the current implementation.
-First, we assume that the user running the migration has access to the machine specified in the argument list.
+First, we assume that the user running the migration has access to the machine
+specified in the argument list.
 In particular we assume SSH access.
-We have chosen to rely on a single execution process, rather than having a client-server architecture like other solutions do~\cite{criu-phaul}.
-Hence why we don't need a server process running in the remote machine, but require execution privileges there.
-Second, we assume the required container bundle (\texttt{rootfs} directory and \texttt{config.json} specification file) to be available in the remote end.
+We have chosen to rely on a single execution process, rather than having a
+client-server architecture like other solutions do~\cite{criu-phaul}.
+Hence why we don't need a server process running in the remote machine, but
+require execution privileges there.
+Second, we assume the required container bundle (\texttt{rootfs} directory and
+\texttt{config.json} specification file) to be available in the remote end.
 These are required to restore the container.
-Note that this assumption could be easily circumvented pre-generating the bundle before executing the migration.
-The procedure to create a \texttt{rootfs} bundle is very straightforward and we include an example in Listing~\ref{code:runc-bundle}.
+Note that this assumption could be easily circumvented pre-generating the
+bundle before executing the migration.
+The procedure to create a \texttt{rootfs} bundle is very straightforward and we
+include an example in Listing~\ref{code:runc-bundle}.
 \begin{lstlisting}[style=Bash,caption={Commands to generate an OCI bundle to run a container using \runc.},label={code:runc-bundle}]
 #!/bin/bash
 # Create a new directory for the container
@@ -496,38 +769,82 @@ docker export `docker create <image-tag>` | tar -C rootfs -xvf -
 # Generate the config file using the OCI runtime tool
 oci-runtime-tool generate <args>
 \end{lstlisting}
-Lastly, it is worth mentioning that the support for rootless containers is still work-in-progress in the \criu project~\cite{criu-user-mode}.
-Therefore, to run the software the user must have \texttt{root} permissions in both machines (in particular \texttt{CAP\_SYS\_ADMIN}).
+Lastly, it is worth mentioning that the support for rootless containers is
+still work-in-progress in the \criu project~\cite{criu-user-mode}.
+Therefore, to run the software the user must have \texttt{root} permissions in
+both machines (in particular \texttt{CAP\_SYS\_ADMIN}).
 
 We have also implemented two additional modules.
-One performs all the interactions with the remote host such as transferring files, creating directories, and running \criu commands.
-In particular, we use \texttt{libssh}~\cite{libssh} to interact with the other node, and implement our methods basing on their low-level primitives.
-The second is a benchmarking module that through conditional compilation adds profiling instructions and generates reports to populate the plots we present throughout this document.
+One performs all the interactions with the remote host such as transferring
+files, creating directories, and running \criu commands.
+In particular, we use \texttt{libssh}~\cite{libssh} to interact with the other
+node, and implement our methods basing on their low-level primitives.
+The second is a benchmarking module that through conditional compilation adds
+profiling instructions and generates reports to populate the plots we present
+throughout this document.
 
 \subsection{Implementation Details}
 
 \textbf{Migration Module}
 
 The first step consists in processing the user input.
-We require the container name, which must be a running container (\textit{i.e.} must have a matching entry in \texttt{sudo runc list}) and an IP address (more on that on the networking module).
+We require the container name, which must be a running container (\textit{i.e.}
+must have a matching entry in \texttt{sudo runc list}) and an IP address (more
+on that on the networking module).
 We also allow for a series of optional parameters.
-Firstly, the user might choose to perform a one-shot migration, rather than an iterative one, and the path to store intermediate results can also be determined at this stage.
-Second, the user can opt to not use diskless migration and persist intermediate files.
-In the event of a diskless migration, the parameters (address and port) where the page server runs also can be determined.
-Lastly, the user can also specify a directory where to mount the \texttt{tmpfs} file system.
+Firstly, the user might choose to perform a one-shot migration, rather than an
+iterative one, and the path to store intermediate results can also be
+determined at this stage.
+Second, the user can opt to not use diskless migration and persist intermediate
+files.
+In the event of a diskless migration, the parameters (address and port) where
+the page server runs also can be determined.
+Lastly, the user can also specify a directory where to mount the \texttt{tmpfs}
+file system.
 Otherwise the system will default to, if available, \texttt{/dev/shm}.
-For the remaining of the walkthrough we will assume the default parameters are set: diskless, iterative migration, with a page server running in the remote end and relying on \texttt{/dev/shm} as our \texttt{tmpfs} file system of choice.
+For the remaining of the walkthrough we will assume the default parameters are
+set: diskless, iterative migration, with a page server running in the remote
+end and relying on \texttt{/dev/shm} as our \texttt{tmpfs} file system of
+choice.
 
-The most important part in the migration procedure is a loop that periodically and while the amount of memory to transfer exceeds a threshold does the following:
+The most important part in the migration procedure is a loop that periodically
+and while the amount of memory to transfer exceeds a threshold does the
+following:
 \begin{enumerate}
-    \item \textbf{Create Directories.} The first step is to create the local and remote directories where image files will be stored. This has to be done before anything else as otherwise the page server will report an error and crash.
-    \item \textbf{Start Page Server.} As previously introduced, \criu's page server is a one-shot command. This means that once it serves a request it terminates. As a consequence at the start of every iteration the command must be re-run. We start it with the following snippet: \texttt{sudo criu page-server -d --images-dir <path> --prev-images-dir <prev-path>} \\\texttt{--port <port>}. Note that the \texttt{prev-images-dir} is crucial to avoid memory duplication.
-    \item \textbf{Checkpoint.} Now we are ready to checkpoint the container. We use the following command: \texttt{sudo runc checkpoint --pre-dump --image-path <path> --page-server <host>:<port>} \\\texttt{<container\_name>}. Note that the \texttt{--pre-dump} flag is crucial to keep the container running and only dump the contents of the memory, which will be automatically over the network to the page server (and not written to disk).
-    \item \textbf{Transfer Remaining Files.} Even though we are only running a \texttt{pre-dump}, there are a few files that need to be transferred to the other node, and we do so at this stage. We additionally perform housekeeping duties cleaning temporary files.
-    \item \textbf{Update Directory Counter.} The last step, and not to be overlooked, consists in updating the directory chain that links iterative dumps. In point 2, we need to specify the path to the preceding directory, as a consequence we keep a linked list of directory names.
+    \item \textbf{Create Directories.
+          }
+          The first step is to create the local and remote directories where image files
+          will be stored.
+          This has to be done before anything else as otherwise the page server will
+          report an error and crash.
+    \item \textbf{Start Page Server.}
+          As previously introduced, \criu's page server is a one-shot command.
+          This means that once it serves a request it terminates.
+          As a consequence at the start of every iteration the command must be re-run.
+          We start it with the following snippet: \texttt{sudo criu page-server -d
+              --images-dir <path> --prev-images-dir <prev-path>} \\\texttt{--port <port>}.
+          Note that the \texttt{prev-images-dir} is crucial to avoid memory duplication.
+    \item \textbf{Checkpoint.}
+          Now we are ready to checkpoint the container.
+          We use the following command: \texttt{sudo runc checkpoint --pre-dump
+              --image-path <path> --page-server <host>:<port>} \\\texttt{<container\_name>}.
+          Note that the \texttt{--pre-dump} flag is crucial to keep the container running
+          and only dump the contents of the memory, which will be automatically over the
+          network to the page server (and not written to disk).
+    \item \textbf{Transfer Remaining Files.}
+          Even though we are only running a \texttt{pre-dump}, there are a few files that
+          need to be transferred to the other node, and we do so at this stage.
+          We additionally perform housekeeping duties cleaning temporary files.
+    \item \textbf{Update Directory Counter.}
+          The last step, and not to be overlooked, consists in updating the directory
+          chain that links iterative dumps.
+          In point 2, we need to specify the path to the preceding directory, as a
+          consequence we keep a linked list of directory names.
 \end{enumerate}
-We include a simplified version of this loop in Listing~\ref{code:iterative-loop}.
-Most of the technical details have been omitted for simplicity, and should be directly inspected in GitHub.
+We include a simplified version of this loop in
+Listing~\ref{code:iterative-loop}.
+Most of the technical details have been omitted for simplicity, and should be
+directly inspected in GitHub.
 \begin{lstlisting}[language=C,caption={Iterative migration internal loop.},label={code:iterative-loop}]
 while (size_to_xfer > MEMORY_THRESHOLD)
 {
@@ -572,8 +889,10 @@ while (size_to_xfer > MEMORY_THRESHOLD)
     i++;
 }
 \end{lstlisting}
-Once we exit the loop, it means the remaining files to transfer are sufficiently small.
-We then proceed to checkpoint and stop the container, transfer the remaining files, and restore it in the other node.
+Once we exit the loop, it means the remaining files to transfer are
+sufficiently small.
+We then proceed to checkpoint and stop the container, transfer the remaining
+files, and restore it in the other node.
 We present a simplified version of the code in Listing~\ref{code:last-cp}.
 \begin{lstlisting}[language=C,caption={Snippet for the last (stopping) checkpoint and remote restore.},label={code:last-cp}]
 /* Prepare Environment: create directories and start page server */
@@ -632,33 +951,74 @@ if (clean_env(args) != 0)
     return 1;
 }
 \end{lstlisting}
-Note that before exiting we call the \texttt{clean\_env} routine that removes temporary files and cleans the remaining processes.
+Note that before exiting we call the \texttt{clean\_env} routine that removes
+temporary files and cleans the remaining processes.
 
 \textbf{Networking Module}
 
-From the code snippets presented in the previous lines, the reader might observe a series of calls to some seemingly unfamiliar methods like \texttt{sftp\_copy\_dir} or \texttt{ssh\_remote\_command}.
-One of the first design choices we faced was to whether follow a client-server architecture, in which a listening process would have to be running in advance in the destination machine, or run all commands from the same process.
-We decided to follow the second approach as it required less dependencies on participating nodes (none other than \criu and \runc).
-This decision implied that we would need programmatic access from the main execution process to the remote node in order to: manipulate the file system, transfer files, and execute privileged commands.
+From the code snippets presented in the previous lines, the reader might
+observe a series of calls to some seemingly unfamiliar methods like
+\texttt{sftp\_copy\_dir} or \texttt{ssh\_remote\_command}.
+One of the first design choices we faced was to whether follow a client-server
+architecture, in which a listening process would have to be running in advance
+in the destination machine, or run all commands from the same process.
+We decided to follow the second approach as it required less dependencies on
+participating nodes (none other than \criu and \runc).
+This decision implied that we would need programmatic access from the main
+execution process to the remote node in order to: manipulate the file system,
+transfer files, and execute privileged commands.
 
-For enhanced control, we decided to implement routines to transfer files and execute remote commands using \texttt{libssh}'s API~\cite{libssh,libssh-api}.
+For enhanced control, we decided to implement routines to transfer files and
+execute remote commands using \texttt{libssh}'s API~\cite{libssh,libssh-api}.
 In particular, we expose the following API calls,
 \begin{itemize}
-    \item \texttt{ssh\_remote\_command}: execute a command remotely. We open an \texttt{ssh\_channel}, use the \texttt{ssh\_channel\_request\_exec} method, and capture the output. Alternatively we can also run the command in non-blocking mode. Lastly, and in order to execute \texttt{root} commands, we used two different workarounds. One first option is to, for the user we authenticate with (part of our initial assumptions), enable password-less sudo. Another one is to pass the password, in clear, over the encrypted SSH channel with a snippet like: \texttt{echo <PWD> | sudo -S <cmd>}.
-    \item \texttt{sftp\_copy\_file}: copies a file to the remote end's specified path. \texttt{libssh} only exposes very low level primitives, so we have to serialize and chunk the file, transfer it over an established \texttt{sftp} channel, rebuild it in the other end, and store it at the desired location.
-    \item \texttt{sftp\_copy\_dir}: recursively copy a directory using the previously introduced method.
+    \item
+          \texttt{ssh\_remote\_command}: execute a command remotely.
+          We open an \texttt{ssh\_channel}, use the \texttt{ssh\_channel\_request\_exec}
+          method, and capture the output.
+          Alternatively we can also run the command in non-blocking mode.
+          Lastly, and in order to execute \texttt{root} commands, we used two different
+          workarounds.
+          One first option is to, for the user we authenticate with (part of our initial
+          assumptions), enable password-less sudo.
+          Another one is to pass the password, in clear, over the encrypted SSH channel
+          with a snippet like: \texttt{echo <PWD> | sudo -S <cmd>}.
+    \item \texttt{sftp\_copy\_file}: copies a file to the remote end's
+          specified path. \texttt{libssh} only exposes very low level
+          primitives, so we
+          have to serialize and chunk the file, transfer it over an established
+          \texttt{sftp} channel, rebuild it in the other end, and store it at
+          the desired
+          location.
+    \item \texttt{sftp\_copy\_dir}: recursively copy a directory using the
+          previously introduced method.
 \end{itemize}
-The full implementation is again available on GitHub, but we include the signatures and a simplified implementation of the methods listed above (without the helper functions) in Listing~\ref{code:libssh}.
+The full implementation is again available on GitHub, but we include the
+signatures and a simplified implementation of the methods listed above (without
+the helper functions) in Listing~\ref{code:libssh}.
 
 \subsection{Usage}
 
 The usage of the tool is very straightforward.
 First, the user must ensure that the previously mentioned assumptions are met.
-This is, the container is running in the host machine, and the user has SSH access to the destination node.
+This is, the container is running in the host machine, and the user has SSH
+access to the destination node.
 The only dependencies for the software to run are \criu and \runc.
-\texttt{libssh} might or might not be available depending on the Linux flavour the user is running in.
-At the time of the writing the system has only been tested in \texttt{Debian} machines.
-When all the dependencies are met, the code can be compiled using \texttt{make all} and executed via \texttt{./migration <container> <host>}.
-This ease of use is not to be overlooked, as similar tools are way more complicated to set up and get running.
-For instance, in order to migrate a process using the old \textsc{P.Haul} interface (\url{https://github.com/checkpoint-restore/p.haul/}), one must set up a NFS mount between source and destination, specify the file descriptors for both RPC and memory socket, and repeat the procedure in both nodes before even starting the script.
-Moreover, the newer interface (\url{https://github.com/checkpoint-restore/go-criu/tree/master/phaul}) does not even allow for standalone execution as it has to be included in a Go project.
+\texttt{libssh} might or might not be available depending on the Linux flavour
+the user is running in.
+At the time of the writing the system has only been tested in \texttt{Debian}
+machines.
+When all the dependencies are met, the code can be compiled using \texttt{make
+    all} and executed via \texttt{.
+    /migration <container> <host>}.
+This ease of use is not to be overlooked, as similar tools are way more
+complicated to set up and get running.
+For instance, in order to migrate a process using the old \textsc{P.Haul}
+interface (\url{https://github.com/checkpoint-restore/p.haul/}), one must set
+up a NFS mount between source and destination, specify the file descriptors for
+both RPC and memory socket, and repeat the procedure in both nodes before even
+starting the script.
+Moreover, the newer interface
+(\url{https://github.com/checkpoint-restore/go-criu/tree/master/phaul}) does
+not even allow for standalone execution as it has to be included in a Go
+project.
